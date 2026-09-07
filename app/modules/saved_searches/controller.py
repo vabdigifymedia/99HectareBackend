@@ -1,0 +1,1 @@
+class SavedSearchController: pass

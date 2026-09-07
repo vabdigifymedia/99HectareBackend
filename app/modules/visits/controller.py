@@ -1,0 +1,1 @@
+class VisitController: pass

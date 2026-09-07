@@ -1,0 +1,1 @@
+class InquiryController: pass

@@ -1,0 +1,1 @@
+class VisitService: pass

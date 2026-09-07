@@ -1,0 +1,1 @@
+class SubscriptionController: pass

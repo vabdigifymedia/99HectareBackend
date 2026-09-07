@@ -1,0 +1,1 @@
+class SavedSearchService: pass

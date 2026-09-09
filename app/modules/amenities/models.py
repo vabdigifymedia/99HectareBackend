@@ -1,18 +1,16 @@
-
-# app/modules/amenities/models.py
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
-    DateTime,
-    Text,
-    ForeignKey,
-    Table,
     Column,
+    DateTime,
+    ForeignKey,
+    String,
+    Table,
+    Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -20,13 +18,11 @@ from app.core.database import Base
 property_amenities = Table(
     "property_amenities",
     Base.metadata,
-
     Column(
         "property_id",
         ForeignKey("properties.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-
     Column(
         "amenity_id",
         ForeignKey("amenities.id", ondelete="CASCADE"),
@@ -38,13 +34,11 @@ property_amenities = Table(
 project_amenities = Table(
     "project_amenities",
     Base.metadata,
-
     Column(
         "project_id",
         ForeignKey("projects.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-
     Column(
         "amenity_id",
         ForeignKey("amenities.id", ondelete="CASCADE"),
@@ -92,13 +86,26 @@ class Amenity(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    properties = relationship(
+        "Property",
+        secondary=property_amenities,
+        back_populates="amenities",
+    )
+
+    projects = relationship(
+        "Project",
+        secondary=project_amenities,
+        back_populates="amenities",
     )

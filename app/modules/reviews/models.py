@@ -1,15 +1,15 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
     Text,
-    CheckConstraint,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -71,13 +71,29 @@ class Review(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="reviews",
+    )
+
+    agent = relationship(
+        "Agent",
+        back_populates="reviews",
+    )
+
+    builder = relationship(
+        "Builder",
+        back_populates="reviews",
     )

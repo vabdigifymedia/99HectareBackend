@@ -2,9 +2,9 @@ import random
 import string
 from datetime import datetime, timedelta, timezone
 
-from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.enums import UserRole
 from app.common.exceptions import (
     BadRequestException,
     ConflictException,
@@ -12,13 +12,21 @@ from app.common.exceptions import (
     UnauthorizedException,
 )
 from app.core.config import settings
-from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
+from app.modules.admin.models import Admin
+from app.modules.agents.models import Agent
+from app.modules.agents.repository import AgentRepository
 from app.modules.auth.models import OTPVerification, RefreshToken
 from app.modules.auth.repository import AuthRepository
+from app.modules.builders.models import Builder
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class AuthService:
@@ -26,12 +34,30 @@ class AuthService:
         self.db = db
         self.auth_repo = AuthRepository(db)
         self.user_repo = UserRepository(db)
+        self.agent_repo = AgentRepository(db)
 
     # ── Register ───────────────────────────────────────────────────
 
     async def register(
-        self, full_name: str, email: str, password: str, phone: str | None = None
+        self,
+        full_name: str,
+        email: str,
+        password: str,
+        phone: str | None = None,
+        role: str = "buyer",
+        agency_name: str | None = None,
+        license_number: str | None = None,
+        rera_registration_number: str | None = None,
+        experience_years: int = 0,
+        company_name: str | None = None,
     ) -> dict:
+        normalized_role = role.lower()
+        allowed_roles = [r.value for r in UserRole]
+        if normalized_role not in allowed_roles:
+            raise BadRequestException(
+                f"Invalid role '{role}'. Allowed roles: {', '.join(allowed_roles)}"
+            )
+
         if await self.user_repo.get_by_email(email):
             raise ConflictException("Email already registered")
 
@@ -42,18 +68,55 @@ class AuthService:
             full_name=full_name,
             email=email,
             phone=phone,
-            password_hash=pwd_context.hash(password),
+            password_hash=hash_password(password),
+            role=normalized_role,
         )
         user = await self.user_repo.create(user)
+
+        # Profile provisioning based on role
+        if normalized_role == UserRole.AGENT.value:
+            agent = Agent(
+                user_id=user.id,
+                agency_name=agency_name,
+                license_number=license_number,
+                rera_registration_number=rera_registration_number,
+                experience_years=experience_years,
+                phone=phone,
+                email=email,
+            )
+            self.db.add(agent)
+            await self.db.flush()
+
+        elif normalized_role == UserRole.BUILDER.value:
+            builder = Builder(
+                user_id=user.id,
+                company_name=company_name or full_name,
+                license_number=license_number,
+                rera_registration_number=rera_registration_number,
+                phone=phone,
+                email=email,
+            )
+            self.db.add(builder)
+            await self.db.flush()
+
+        elif normalized_role == UserRole.ADMIN.value:
+            admin = Admin(
+                user_id=user.id,
+                admin_level="SUPER_ADMIN",
+            )
+            self.db.add(admin)
+            await self.db.flush()
+
         await self.db.commit()
 
+        user = await self.user_repo.get_by_id_with_profiles(user.id)
         return await self._generate_tokens(user)
 
     # ── Login ──────────────────────────────────────────────────────
 
     async def login(self, email: str, password: str) -> dict:
         user = await self.user_repo.get_by_email(email)
-        if not user or not pwd_context.verify(password, user.password_hash):
+        if not user or not verify_password(password, user.password_hash):
             raise UnauthorizedException("Invalid email or password")
 
         if not user.is_active:
@@ -101,6 +164,37 @@ class AuthService:
         if not user.is_active:
             raise UnauthorizedException("Account is deactivated")
         return user
+
+    # ── Become Agent / Upgrade to Property Dealer ─────────────────
+
+    async def become_agent(self, user_id: int, agent_data: dict) -> Agent:
+        user = await self.user_repo.get_by_id_with_profiles(user_id)
+        if not user:
+            raise NotFoundException("User not found")
+
+        agent = await self.agent_repo.get_by_user_id(user_id)
+        if agent:
+            for k, v in agent_data.items():
+                if v is not None and hasattr(agent, k):
+                    setattr(agent, k, v)
+        else:
+            agent = Agent(
+                user_id=user.id,
+                agency_name=agent_data.get("agency_name"),
+                license_number=agent_data.get("license_number"),
+                rera_registration_number=agent_data.get("rera_registration_number"),
+                experience_years=agent_data.get("experience_years", 0),
+                phone=agent_data.get("phone") or user.phone,
+                email=agent_data.get("email") or user.email,
+                website=str(agent_data["website"]) if agent_data.get("website") else None,
+                description=agent_data.get("description"),
+            )
+            self.db.add(agent)
+
+        user.role = UserRole.AGENT.value
+        await self.db.commit()
+        await self.db.refresh(agent)
+        return agent
 
     # ── Email Verification ─────────────────────────────────────────
 
@@ -182,7 +276,7 @@ class AuthService:
             raise BadRequestException("Invalid reset code")
 
         await self.auth_repo.mark_otp_verified(otp_record)
-        user.password_hash = pwd_context.hash(new_password)
+        user.password_hash = hash_password(new_password)
         await self.auth_repo.revoke_all_user_tokens(user.id)
         await self.db.commit()
 
@@ -195,17 +289,20 @@ class AuthService:
         if not user:
             raise UnauthorizedException("User not found")
 
-        if not pwd_context.verify(current_password, user.password_hash):
+        if not verify_password(current_password, user.password_hash):
             raise BadRequestException("Current password is incorrect")
 
-        user.password_hash = pwd_context.hash(new_password)
+        user.password_hash = hash_password(new_password)
         await self.auth_repo.revoke_all_user_tokens(user.id)
         await self.db.commit()
 
     # ── Helpers ────────────────────────────────────────────────────
 
     async def _generate_tokens(self, user: User) -> dict:
-        access = create_access_token(subject=str(user.id))
+        access = create_access_token(
+            subject=str(user.id),
+            claims={"role": user.role, "email": user.email},
+        )
         refresh = create_refresh_token(subject=str(user.id))
 
         refresh_record = RefreshToken(
@@ -222,6 +319,8 @@ class AuthService:
             "access_token": access,
             "refresh_token": refresh,
             "token_type": "bearer",
+            "role": user.role,
+            "user": user,
         }
 
     @staticmethod

@@ -1,16 +1,18 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -218,10 +220,12 @@ class Property(Base):
     )
 
     latitude: Mapped[float | None] = mapped_column(
+        Float,
         nullable=True,
     )
 
     longitude: Mapped[float | None] = mapped_column(
+        Float,
         nullable=True,
     )
 
@@ -297,16 +301,104 @@ class Property(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
         index=True,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    owner = relationship(
+        "User",
+        back_populates="properties",
+        foreign_keys=[owner_id],
+    )
+
+    agent = relationship(
+        "Agent",
+        back_populates="properties",
+        foreign_keys=[agent_id],
+    )
+
+    builder = relationship(
+        "Builder",
+        back_populates="properties",
+        foreign_keys=[builder_id],
+    )
+
+    project = relationship(
+        "Project",
+        back_populates="properties",
+        foreign_keys=[project_id],
+    )
+
+    country = relationship("Country")
+    state = relationship("State")
+    city = relationship("City")
+    locality = relationship("Locality")
+    sub_locality = relationship("SubLocality")
+
+    media = relationship(
+        "PropertyMedia",
+        back_populates="property",
+        cascade="all, delete-orphan",
+    )
+
+    documents = relationship(
+        "PropertyDocument",
+        back_populates="property",
+        cascade="all, delete-orphan",
+    )
+
+    amenities = relationship(
+        "Amenity",
+        secondary="property_amenities",
+        back_populates="properties",
+    )
+
+    residential_details = relationship(
+        "ResidentialPropertyDetails",
+        back_populates="property",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    commercial_details = relationship(
+        "CommercialPropertyDetails",
+        back_populates="property",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    plot_details = relationship(
+        "PlotPropertyDetails",
+        back_populates="property",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    inquiries = relationship(
+        "Inquiry",
+        back_populates="property",
+        cascade="all, delete-orphan",
+    )
+
+    visits = relationship(
+        "Visit",
+        back_populates="property",
+        cascade="all, delete-orphan",
+    )
+
+    favorites = relationship(
+        "Favorite",
+        back_populates="property",
+        cascade="all, delete-orphan",
     )
 
 
@@ -371,6 +463,11 @@ class ResidentialPropertyDetails(Base):
         nullable=False,
     )
 
+    property = relationship(
+        "Property",
+        back_populates="residential_details",
+    )
+
 
 class CommercialPropertyDetails(Base):
     __tablename__ = "commercial_property_details"
@@ -425,6 +522,11 @@ class CommercialPropertyDetails(Base):
         nullable=False,
     )
 
+    property = relationship(
+        "Property",
+        back_populates="commercial_details",
+    )
+
 
 class PlotPropertyDetails(Base):
     __tablename__ = "plot_property_details"
@@ -472,4 +574,9 @@ class PlotPropertyDetails(Base):
         Boolean,
         default=False,
         nullable=False,
+    )
+
+    property = relationship(
+        "Property",
+        back_populates="plot_details",
     )

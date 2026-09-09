@@ -1,15 +1,15 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -62,8 +62,14 @@ class PropertyMedia(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    property = relationship(
+        "Property",
+        back_populates="media",
     )
 
 
@@ -105,8 +111,14 @@ class PropertyDocument(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    property = relationship(
+        "Property",
+        back_populates="documents",
     )
 
 
@@ -158,6 +170,12 @@ class ProjectMedia(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    project = relationship(
+        "Project",
+        back_populates="media",
     )

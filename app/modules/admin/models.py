@@ -1,15 +1,15 @@
-# app/modules/admin/models.py
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -53,15 +53,27 @@ class Admin(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="admin_profile",
+    )
+
+    action_logs = relationship(
+        "AdminActionLog",
+        back_populates="admin",
+        cascade="all, delete-orphan",
     )
 
 
@@ -90,6 +102,7 @@ class AdminActionLog(Base):
     )
 
     entity_id: Mapped[int | None] = mapped_column(
+        Integer,
         nullable=True,
     )
 
@@ -105,6 +118,12 @@ class AdminActionLog(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    admin = relationship(
+        "Admin",
+        back_populates="action_logs",
     )

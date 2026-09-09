@@ -1,14 +1,15 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -84,6 +85,7 @@ class Builder(Base):
     )
 
     established_year: Mapped[int | None] = mapped_column(
+        Integer,
         nullable=True,
     )
 
@@ -101,13 +103,40 @@ class Builder(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="builder_profile",
+    )
+
+    projects = relationship(
+        "Project",
+        back_populates="builder",
+        cascade="all, delete-orphan",
+    )
+
+    properties = relationship(
+        "Property",
+        back_populates="builder",
+    )
+
+    inquiries = relationship(
+        "Inquiry",
+        back_populates="builder",
+    )
+
+    reviews = relationship(
+        "Review",
+        back_populates="builder",
     )

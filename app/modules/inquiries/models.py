@@ -1,13 +1,13 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     DateTime,
     ForeignKey,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -84,13 +84,39 @@ class Inquiry(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="inquiries",
+    )
+
+    property = relationship(
+        "Property",
+        back_populates="inquiries",
+    )
+
+    project = relationship(
+        "Project",
+        back_populates="inquiries",
+    )
+
+    agent = relationship(
+        "Agent",
+        back_populates="inquiries",
+    )
+
+    builder = relationship(
+        "Builder",
+        back_populates="inquiries",
     )

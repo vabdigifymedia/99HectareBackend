@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.schemas import (
+    BecomeAgentRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -23,6 +24,12 @@ class AuthController:
             email=body.email,
             password=body.password,
             phone=body.phone,
+            role=body.role,
+            agency_name=body.agency_name,
+            license_number=body.license_number,
+            rera_registration_number=body.rera_registration_number,
+            experience_years=body.experience_years,
+            company_name=body.company_name,
         )
 
     async def login(self, body: LoginRequest) -> dict:
@@ -33,6 +40,12 @@ class AuthController:
 
     async def logout(self, body: RefreshTokenRequest) -> None:
         await self.service.logout(refresh_token_str=body.refresh_token)
+
+    async def become_agent(self, user_id: int, body: BecomeAgentRequest):
+        return await self.service.become_agent(
+            user_id=user_id,
+            agent_data=body.model_dump(),
+        )
 
     async def request_email_verification(self, body: RequestOTPRequest) -> str:
         return await self.service.request_email_verification(email=body.email)

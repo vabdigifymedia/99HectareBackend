@@ -1,14 +1,13 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     DateTime,
-    ForeignKey,
     Float,
-    Integer,
+    ForeignKey,
+    String,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -41,8 +40,15 @@ class Country(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    states = relationship(
+        "State",
+        back_populates="country",
+        cascade="all, delete-orphan",
     )
 
 
@@ -73,8 +79,20 @@ class State(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    country = relationship(
+        "Country",
+        back_populates="states",
+    )
+
+    cities = relationship(
+        "City",
+        back_populates="state",
+        cascade="all, delete-orphan",
     )
 
 
@@ -110,8 +128,20 @@ class City(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    state = relationship(
+        "State",
+        back_populates="cities",
+    )
+
+    localities = relationship(
+        "Locality",
+        back_populates="city",
+        cascade="all, delete-orphan",
     )
 
 
@@ -153,8 +183,20 @@ class Locality(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    city = relationship(
+        "City",
+        back_populates="localities",
+    )
+
+    sub_localities = relationship(
+        "SubLocality",
+        back_populates="locality",
+        cascade="all, delete-orphan",
     )
 
 
@@ -195,6 +237,12 @@ class SubLocality(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    locality = relationship(
+        "Locality",
+        back_populates="sub_localities",
     )

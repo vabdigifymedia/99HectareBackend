@@ -1,12 +1,12 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
     DateTime,
     ForeignKey,
     UniqueConstraint,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -41,6 +41,17 @@ class Favorite(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="favorites",
+    )
+
+    property = relationship(
+        "Property",
+        back_populates="favorites",
     )

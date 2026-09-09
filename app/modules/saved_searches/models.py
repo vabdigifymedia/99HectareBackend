@@ -1,17 +1,16 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
+    JSON,
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
     Numeric,
-    Boolean,
-    JSON,
-    Text,
+    String,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -106,13 +105,22 @@ class SavedSearch(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="saved_searches",
+    )
+
+    city = relationship("City")
+    locality = relationship("Locality")

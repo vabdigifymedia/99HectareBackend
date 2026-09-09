@@ -1,8 +1,14 @@
-# app/modules/auth/models.py
-
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text
-from sqlalchemy.orm import Mapped, mapped_column
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -38,8 +44,14 @@ class RefreshToken(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="refresh_tokens",
     )
 
 
@@ -77,6 +89,12 @@ class OTPVerification(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    user = relationship(
+        "User",
+        back_populates="otp_verifications",
     )

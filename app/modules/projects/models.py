@@ -1,16 +1,17 @@
-
 from datetime import date, datetime
 
 from sqlalchemy import (
-    String,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
+    String,
     Text,
+    func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -118,10 +119,12 @@ class Project(Base):
     )
 
     latitude: Mapped[float | None] = mapped_column(
+        Float,
         nullable=True,
     )
 
     longitude: Mapped[float | None] = mapped_column(
+        Float,
         nullable=True,
     )
 
@@ -133,16 +136,56 @@ class Project(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
     )
+
+    # Relationships
+    builder = relationship(
+        "Builder",
+        back_populates="projects",
+    )
+
+    units = relationship(
+        "ProjectUnit",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+    media = relationship(
+        "ProjectMedia",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+    amenities = relationship(
+        "Amenity",
+        secondary="project_amenities",
+        back_populates="projects",
+    )
+
+    properties = relationship(
+        "Property",
+        back_populates="project",
+    )
+
+    inquiries = relationship(
+        "Inquiry",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+    country = relationship("Country")
+    state = relationship("State")
+    city = relationship("City")
+    locality = relationship("Locality")
 
 
 class ProjectUnit(Base):
@@ -212,13 +255,19 @@ class ProjectUnit(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
+    )
+
+    # Relationships
+    project = relationship(
+        "Project",
+        back_populates="units",
     )

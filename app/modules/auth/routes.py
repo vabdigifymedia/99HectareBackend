@@ -5,9 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.responses import SuccessResponse
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_active_user, get_current_user
+from app.modules.agents.schemas import AgentResponse
 from app.modules.auth.controller import AuthController
 from app.modules.auth.schemas import (
+    BecomeAgentRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -15,10 +17,11 @@ from app.modules.auth.schemas import (
     RegisterRequest,
     RequestOTPRequest,
     ResetPasswordRequest,
-    VerifyOTPRequest,
     TokenResponse,
     UserResponse,
+    VerifyOTPRequest,
 )
+from app.modules.users.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -75,12 +78,25 @@ async def logout(
     return SuccessResponse(message="Logged out successfully")
 
 
+# ── Become Agent / Upgrade to Property Dealer ─────────────────────
+
+
+@router.post("/become-agent", response_model=SuccessResponse[AgentResponse])
+async def become_agent(
+    body: BecomeAgentRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    controller: AuthController = Depends(get_controller),
+):
+    agent = await controller.become_agent(current_user.id, body)
+    return SuccessResponse(
+        message="Successfully upgraded to Agent/Property Dealer", data=agent
+    )
+
+
 # ── Email Verification ─────────────────────────────────────────────
 
 
-@router.post(
-    "/verify-email/request", response_model=SuccessResponse
-)
+@router.post("/verify-email/request", response_model=SuccessResponse)
 async def request_email_verification(
     body: RequestOTPRequest,
     controller: AuthController = Depends(get_controller),
@@ -88,7 +104,7 @@ async def request_email_verification(
     otp = await controller.request_email_verification(body)
     return SuccessResponse(
         message="Verification code sent to your email",
-        data={"otp": otp} if True else None,
+        data={"otp": otp},
     )
 
 
@@ -112,7 +128,7 @@ async def request_password_reset(
     otp = await controller.request_password_reset(body)
     return SuccessResponse(
         message="Password reset code sent to your email",
-        data={"otp": otp} if True else None,
+        data={"otp": otp},
     )
 
 
@@ -131,10 +147,10 @@ async def reset_password(
 @router.post("/change-password", response_model=SuccessResponse)
 async def change_password(
     body: ChangePasswordRequest,
-    current_user: Annotated[dict, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     controller: AuthController = Depends(get_controller),
 ):
-    await controller.change_password(user_id=current_user["id"], body=body)
+    await controller.change_password(user_id=current_user.id, body=body)
     return SuccessResponse(message="Password changed successfully")
 
 
@@ -143,8 +159,8 @@ async def change_password(
 
 @router.get("/me", response_model=SuccessResponse[UserResponse])
 async def get_me(
-    current_user: Annotated[dict, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     controller: AuthController = Depends(get_controller),
 ):
-    user = await controller.get_current_user(user_id=current_user["id"])
+    user = await controller.get_current_user(user_id=current_user.id)
     return SuccessResponse(message="User profile", data=user)

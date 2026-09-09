@@ -1,4 +1,3 @@
-
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -7,6 +6,9 @@ from pydantic import (
     ConfigDict,
     Field,
 )
+
+from app.modules.amenities.schemas import AmenityResponse
+from app.modules.media.schemas import PropertyMediaResponse
 
 
 class PropertyCreate(BaseModel):
@@ -159,8 +161,9 @@ class PropertyCreate(BaseModel):
     project_id: int | None = None
 
     rera_number: str | None = None
-
     ownership_type: str | None = None
+    status: str = "ACTIVE"
+    amenity_ids: list[int] | None = None
 
 
 class PropertyUpdate(BaseModel):
@@ -269,6 +272,11 @@ class PropertyUpdate(BaseModel):
         ge=-180,
         le=180,
     )
+
+    status: str | None = None
+    is_active: bool | None = None
+    rera_number: str | None = None
+    ownership_type: str | None = None
 
 
 class PropertyStatusUpdate(BaseModel):
@@ -469,3 +477,80 @@ class PlotPropertyDetailsResponse(BaseModel):
     boundary_wall: bool
     corner_plot: bool
     gated_community: bool
+
+
+class PropertyMediaCreateInput(BaseModel):
+    media_type: str = Field(
+        max_length=30,
+        description="Media type, e.g., IMAGE, VIDEO, FLOOR_PLAN, BROCHURE",
+    )
+    url: str
+    thumbnail_url: str | None = None
+    title: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+    sort_order: int = Field(
+        default=0,
+        ge=0,
+    )
+    is_primary: bool = False
+
+
+class PropertyAmenitiesAssignRequest(BaseModel):
+    amenity_ids: list[int] = Field(
+        default_factory=list,
+        description="List of Amenity IDs to associate with this property",
+    )
+
+
+class UserBriefResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    full_name: str
+    email: str
+    phone: str | None = None
+
+
+class AgentBriefResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    agency_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    profile_image: str | None = None
+    rera_registration_number: str | None = None
+
+
+class BuilderBriefResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_name: str
+    phone: str | None = None
+    email: str | None = None
+    logo: str | None = None
+    rera_registration_number: str | None = None
+
+
+class ProjectBriefResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    project_type: str
+    status: str
+
+
+class PropertyDetailResponse(PropertyResponse):
+    media: list[PropertyMediaResponse] = []
+    amenities: list[AmenityResponse] = []
+    residential_details: ResidentialPropertyDetailsResponse | None = None
+    commercial_details: CommercialPropertyDetailsResponse | None = None
+    plot_details: PlotPropertyDetailsResponse | None = None
+    owner: UserBriefResponse | None = None
+    agent: AgentBriefResponse | None = None
+    builder: BuilderBriefResponse | None = None
+    project: ProjectBriefResponse | None = None

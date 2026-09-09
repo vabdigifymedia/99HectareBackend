@@ -2,12 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.core.database import AsyncSessionLocal
-
+from app import models  # noqa: F401 - Register all models with SQLAlchemy
 from app.common.exception_handlers import app_exception_handler, generic_exception_handler
 from app.common.exceptions import AppException
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.modules.routes import router as routes
+from sqlalchemy.orm import configure_mappers
+
+# Ensure all SQLAlchemy relationships are configured across all registered models
+configure_mappers()
 
 app = FastAPI(
     title=settings.APP_NAME,

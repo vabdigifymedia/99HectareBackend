@@ -1,1 +1,223 @@
-class PropertyRepository: pass
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.modules.amenities.models import Amenity
+from app.modules.media.models import PropertyMedia
+from app.modules.projects.models import Project
+from app.modules.properties.models import (
+    CommercialPropertyDetails,
+    PlotPropertyDetails,
+    Property,
+    ResidentialPropertyDetails,
+)
+
+
+class PropertyRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_by_id(self, property_id: int) -> Property | None:
+        """Fetch a property by ID."""
+        result = await self.db.execute(
+            select(Property).where(Property.id == property_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id_detailed(self, property_id: int) -> Property | None:
+        """Fetch a property with all related entities eagerly loaded."""
+        result = await self.db.execute(
+            select(Property)
+            .options(
+                selectinload(Property.media),
+                selectinload(Property.amenities),
+                selectinload(Property.residential_details),
+                selectinload(Property.commercial_details),
+                selectinload(Property.plot_details),
+                selectinload(Property.owner),
+                selectinload(Property.agent),
+                selectinload(Property.builder),
+                selectinload(Property.project),
+                selectinload(Property.country),
+                selectinload(Property.state),
+                selectinload(Property.city),
+                selectinload(Property.locality),
+                selectinload(Property.sub_locality),
+            )
+            .where(Property.id == property_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_properties(
+        self,
+        filters: dict[str, Any],
+        offset: int = 0,
+        limit: int = 20,
+        sort_by: str = "newest",
+    ) -> tuple[list[Property], int]:
+        """List properties with dynamic 99acres-style filters and pagination."""
+        conditions = []
+
+        if filters.get("property_type"):
+            conditions.append(Property.property_type == filters["property_type"])
+
+        if filters.get("listing_type"):
+            conditions.append(Property.listing_type == filters["listing_type"])
+
+        if filters.get("status"):
+            conditions.append(Property.status == filters["status"])
+
+        if filters.get("is_active") is not None:
+            conditions.append(Property.is_active == filters["is_active"])
+
+        if filters.get("is_featured") is not None:
+            conditions.append(Property.is_featured == filters["is_featured"])
+
+        if filters.get("is_verified") is not None:
+            conditions.append(Property.is_verified == filters["is_verified"])
+
+        if filters.get("city_id"):
+            conditions.append(Property.city_id == filters["city_id"])
+
+        if filters.get("state_id"):
+            conditions.append(Property.state_id == filters["state_id"])
+
+        if filters.get("locality_id"):
+            conditions.append(Property.locality_id == filters["locality_id"])
+
+        if filters.get("sub_locality_id"):
+            conditions.append(Property.sub_locality_id == filters["sub_locality_id"])
+
+        if filters.get("min_price") is not None:
+            conditions.append(Property.price >= filters["min_price"])
+
+        if filters.get("max_price") is not None:
+            conditions.append(Property.price <= filters["max_price"])
+
+        if filters.get("bedrooms") is not None:
+            conditions.append(Property.bedrooms == filters["bedrooms"])
+
+        if filters.get("bathrooms") is not None:
+            conditions.append(Property.bathrooms == filters["bathrooms"])
+
+        if filters.get("furnishing_status"):
+            conditions.append(
+                Property.furnishing_status == filters["furnishing_status"]
+            )
+
+        if filters.get("builder_id"):
+            conditions.append(Property.builder_id == filters["builder_id"])
+
+        if filters.get("project_id"):
+            conditions.append(Property.project_id == filters["project_id"])
+
+        if filters.get("agent_id"):
+            conditions.append(Property.agent_id == filters["agent_id"])
+
+        if filters.get("owner_id"):
+            conditions.append(Property.owner_id == filters["owner_id"])
+
+        if filters.get("search"):
+            term = f"%{filters['search'].strip()}%"
+            conditions.append(
+                or_(
+                    Property.title.ilike(term),
+                    Property.description.ilike(term),
+                    Property.address.ilike(term),
+                    Property.landmark.ilike(term),
+                )
+            )
+
+        # Count total matches
+        count_query = select(func.count(Property.id)).where(*conditions)
+        total_res = await self.db.execute(count_query)
+        total = total_res.scalar_one() or 0
+
+        # Determine sorting
+        if sort_by == "price_asc":
+            order_by = Property.price.asc()
+        elif sort_by == "price_desc":
+            order_by = Property.price.desc()
+        elif sort_by == "area_asc":
+            order_by = Property.carpet_area.asc().nullslast()
+        elif sort_by == "area_desc":
+            order_by = Property.carpet_area.desc().nullslast()
+        else:
+            order_by = Property.created_at.desc()
+
+        # Query paginated rows
+        query = (
+            select(Property)
+            .options(
+                selectinload(Property.media),
+            )
+            .where(*conditions)
+            .order_by(order_by)
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        items = list(result.scalars().all())
+
+        return items, total
+
+    async def create(self, prop: Property) -> Property:
+        self.db.add(prop)
+        await self.db.flush()
+        await self.db.refresh(prop)
+        return prop
+
+    async def update(self, prop: Property) -> Property:
+        await self.db.flush()
+        await self.db.refresh(prop)
+        return prop
+
+    async def delete(self, prop: Property) -> None:
+        await self.db.delete(prop)
+        await self.db.flush()
+
+    # ── Media ─────────────────────────────────────────────────────────
+
+    async def add_media(self, media: PropertyMedia) -> PropertyMedia:
+        self.db.add(media)
+        await self.db.flush()
+        await self.db.refresh(media)
+        return media
+
+    async def unset_primary_media(self, property_id: int) -> None:
+        await self.db.execute(
+            update(PropertyMedia)
+            .where(PropertyMedia.property_id == property_id)
+            .values(is_primary=False)
+        )
+        await self.db.flush()
+
+    # ── Amenities ─────────────────────────────────────────────────────
+
+    async def get_amenities_by_ids(self, amenity_ids: list[int]) -> list[Amenity]:
+        if not amenity_ids:
+            return []
+        result = await self.db.execute(
+            select(Amenity).where(Amenity.id.in_(amenity_ids))
+        )
+        return list(result.scalars().all())
+
+    async def assign_amenities(
+        self, prop: Property, amenities: list[Amenity]
+    ) -> list[Amenity]:
+        # Assign secondary relationship
+        prop.amenities = amenities
+        await self.db.flush()
+        await self.db.refresh(prop, ["amenities"])
+        return prop.amenities
+
+    # ── Project ───────────────────────────────────────────────────────
+
+    async def get_project(self, project_id: int) -> Project | None:
+        result = await self.db.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        return result.scalar_one_or_none()

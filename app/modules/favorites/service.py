@@ -5,7 +5,8 @@ from app.modules.favorites.schemas import FavoriteCreate
 from app.modules.properties.models import Property
 from app.modules.properties.repository import PropertyRepository
 from app.modules.users.models import User
-from app.common.exceptions import NotFoundException
+from app.common.exceptions import BadRequestException, NotFoundException
+from app.modules.favorites.models import Favorite
 
 
 

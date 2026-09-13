@@ -3,7 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app import models  # noqa: F401 - Register all models with SQLAlchemy
-from app.common.exception_handlers import app_exception_handler, generic_exception_handler
+from sqlalchemy.exc import IntegrityError
+from app.common.exception_handlers import (
+    app_exception_handler,
+    generic_exception_handler,
+    integrity_exception_handler,
+)
 from app.common.exceptions import AppException
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -35,7 +40,9 @@ app.include_router(routes, prefix="/api/v1")
 # ── Exception Handlers ─────────────────────────────────────────────
 
 app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(IntegrityError, integrity_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
+
 
 
 @app.get("/")

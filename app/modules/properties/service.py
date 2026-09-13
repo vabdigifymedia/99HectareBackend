@@ -8,6 +8,7 @@ from app.common.exceptions import (
     NotFoundException,
 )
 from app.modules.amenities.models import Amenity
+from app.modules.locations.models import City, Country, Locality, State, SubLocality
 from app.modules.media.models import PropertyMedia
 from app.modules.properties.models import Property
 from app.modules.properties.repository import PropertyRepository
@@ -17,6 +18,7 @@ from app.modules.properties.schemas import (
     PropertyUpdate,
 )
 from app.modules.users.models import User
+
 
 
 class PropertyService:
@@ -56,11 +58,44 @@ class PropertyService:
             "You do not have permission to perform this action on this property"
         )
 
+    async def _validate_location_references(self, data: dict[str, Any]) -> None:
+        """Validate that any provided location IDs exist in the database."""
+        if data.get("country_id") is not None:
+            if not await self.repo.location_exists(Country, data["country_id"]):
+                raise BadRequestException(
+                    f"Country with ID {data['country_id']} does not exist"
+                )
+
+        if data.get("state_id") is not None:
+            if not await self.repo.location_exists(State, data["state_id"]):
+                raise BadRequestException(
+                    f"State with ID {data['state_id']} does not exist"
+                )
+
+        if data.get("city_id") is not None:
+            if not await self.repo.location_exists(City, data["city_id"]):
+                raise BadRequestException(
+                    f"City with ID {data['city_id']} does not exist"
+                )
+
+        if data.get("locality_id") is not None:
+            if not await self.repo.location_exists(Locality, data["locality_id"]):
+                raise BadRequestException(
+                    f"Locality with ID {data['locality_id']} does not exist"
+                )
+
+        if data.get("sub_locality_id") is not None:
+            if not await self.repo.location_exists(SubLocality, data["sub_locality_id"]):
+                raise BadRequestException(
+                    f"Sub-locality with ID {data['sub_locality_id']} does not exist"
+                )
+
     # ── Create Property ────────────────────────────────────────────────
 
     async def create_property(
         self, current_user: User, data: PropertyCreate
     ) -> Property:
+
         """
         Create a property listing adhering to 99acres role flows:
         1. USER Flow:
@@ -134,7 +169,11 @@ class PropertyService:
         if not payload.get("status"):
             payload["status"] = "ACTIVE"
 
+        # Validate location references if provided
+        await self._validate_location_references(payload)
+
         prop = Property(**payload)
+
 
         # Attach amenities if provided
         if amenity_ids:
@@ -195,7 +234,11 @@ class PropertyService:
 
         update_data = data.model_dump(exclude_unset=True)
 
+        # Validate location references if provided
+        await self._validate_location_references(update_data)
+
         # Validate project ownership if builder attempts to link/change project
+
         if "project_id" in update_data and update_data["project_id"] is not None:
             if current_user.role == "builder":
                 project = await self.repo.get_project(update_data["project_id"])

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.amenities.models import Amenity
+from app.modules.locations.models import City, Country, Locality, State, SubLocality
 from app.modules.media.models import PropertyMedia
 from app.modules.projects.models import Project
 from app.modules.properties.models import (
@@ -14,6 +15,7 @@ from app.modules.properties.models import (
     Property,
     ResidentialPropertyDetails,
 )
+
 
 
 class PropertyRepository:
@@ -221,3 +223,10 @@ class PropertyRepository:
             select(Project).where(Project.id == project_id)
         )
         return result.scalar_one_or_none()
+
+    # ── Location Validation ───────────────────────────────────────────
+
+    async def location_exists(self, model, entity_id: int) -> bool:
+        result = await self.db.execute(select(model.id).where(model.id == entity_id))
+        return result.scalar_one_or_none() is not None
+

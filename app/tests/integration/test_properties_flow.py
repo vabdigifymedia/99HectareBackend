@@ -386,3 +386,89 @@ async def test_property_media_and_amenities(client: AsyncClient, db_session: Asy
     detail_data = detail_res.json()["data"]
     assert len(detail_data["media"]) == 1
     assert len(detail_data["amenities"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_property_creation_with_locations(client: AsyncClient):
+    """Test creating a property with valid location references (country, state, city, locality, sub_locality)."""
+    token, _ = await register_user(client, role="buyer")
+
+    prop_payload = {
+        "title": "3 BHK Premium Apartment in Sector 57",
+        "description": "Spacious 3 BHK apartment with modern amenities and excellent connectivity.",
+        "property_type": "apartment",
+        "listing_type": "SALE",
+        "price": 12500000.00,
+        "carpet_area": 950.00,
+        "country_id": 1,
+        "state_id": 1,
+        "city_id": 1,
+        "locality_id": 1,
+        "sub_locality_id": 1,
+        "address": "Sector 57, Gurugram, Haryana",
+        "landmark": "Near Golf Course Road",
+        "pincode": "122011",
+    }
+
+    res = await client.post(
+        "/api/v1/properties",
+        headers={"Authorization": f"Bearer {token}"},
+        json=prop_payload,
+    )
+    assert res.status_code == 201, res.text
+    data = res.json()["data"]
+    assert data["title"] == prop_payload["title"]
+    assert data["city_id"] == 1
+    assert data["state_id"] == 1
+    assert data["country_id"] == 1
+    assert data["locality_id"] == 1
+    assert data["sub_locality_id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_property_creation_invalid_location_fails(client: AsyncClient):
+    """Test that creating a property with a non-existent city_id returns a 400 Bad Request, not a 500 crash."""
+    token, _ = await register_user(client, role="buyer")
+
+    prop_payload = {
+        "title": "Invalid Location Apartment",
+        "description": "Testing invalid foreign key handling.",
+        "property_type": "apartment",
+        "listing_type": "SALE",
+        "price": 5000000.00,
+        "city_id": 99999,
+    }
+
+    res = await client.post(
+        "/api/v1/properties",
+        headers={"Authorization": f"Bearer {token}"},
+        json=prop_payload,
+    )
+    assert res.status_code == 400
+    assert "City with ID 99999 does not exist" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_locations_endpoints(client: AsyncClient):
+    """Test that location endpoints return seeded countries, states, and cities."""
+    # List countries
+    res = await client.get("/api/v1/locations/countries")
+    assert res.status_code == 200
+    countries = res.json()["data"]
+    assert len(countries) >= 1
+    assert any(c["name"] == "India" for c in countries)
+
+    # List states
+    res = await client.get("/api/v1/locations/states")
+    assert res.status_code == 200
+    states = res.json()["data"]
+    assert len(states) >= 1
+    assert any(s["name"] == "Haryana" for s in states)
+
+    # List cities
+    res = await client.get("/api/v1/locations/cities?search=Gurugram")
+    assert res.status_code == 200
+    cities = res.json()["data"]
+    assert len(cities) >= 1
+    assert cities[0]["name"] == "Gurugram"
+

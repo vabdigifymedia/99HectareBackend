@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -23,6 +22,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     phone: str | None
+    role: str
     is_active: bool
     is_verified: bool
     created_at: datetime
@@ -32,3 +32,6 @@ class UserResponse(BaseModel):
 class UserListResponse(BaseModel):
     items: list[UserResponse]
     total: int
+    page: int
+    page_size: int
+    total_pages: int

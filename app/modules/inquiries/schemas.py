@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from pydantic import (
@@ -39,10 +38,24 @@ class InquiryCreate(BaseModel):
 class InquiryUpdate(BaseModel):
     status: str | None = Field(
         default=None,
-        pattern="^(NEW|CONTACTED|INTERESTED|VISITED|CONVERTED|CLOSED|CANCELLED)$"
+        pattern="^(NEW|CONTACTED|INTERESTED|VISITED|CONVERTED|CLOSED|CANCELLED|APPROVED|REJECTED|PENDING_APPROVAL)$",
     )
 
     message: str | None = None
+
+
+class InquiryAdminApproveRequest(BaseModel):
+    admin_notes: str | None = Field(
+        default=None,
+        description="Optional notes regarding manual payment discussion or verification",
+    )
+
+
+class InquiryAdminRejectRequest(BaseModel):
+    reason: str | None = Field(
+        default=None,
+        description="Reason for rejection",
+    )
 
 
 class InquiryResponse(BaseModel):
@@ -64,6 +77,9 @@ class InquiryResponse(BaseModel):
     message: str | None
     status: str
     source: str | None
+
+    is_admin_approved: bool = False
+    admin_notes: str | None = None
 
     created_at: datetime
     updated_at: datetime

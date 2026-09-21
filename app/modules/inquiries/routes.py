@@ -47,14 +47,14 @@ async def create_inquiry(
     )
 
 
-# ── Get My Inquiries ─────────────────────────────────────────────────
+# ── Get My Inquiries (submitted by me) ────────────────────────────────
 
 
 @router.get(
     "/my",
     response_model=SuccessResponse[list[InquiryResponse]],
     status_code=status.HTTP_200_OK,
-    summary="Get my inquiries",
+    summary="Get my submitted inquiries",
     description="Retrieve all inquiries submitted by the current authenticated user.",
 )
 async def get_my_inquiries(
@@ -68,6 +68,30 @@ async def get_my_inquiries(
     )
 
 
+# ── Get Received Inquiries (for agent or property owner) ───────────────
+
+
+@router.get(
+    "/received",
+    response_model=SuccessResponse[list[InquiryResponse]],
+    status_code=status.HTTP_200_OK,
+    summary="Get received inquiries (leads)",
+    description=(
+        "Retrieve inquiries received for properties owned or listed by the authenticated user. "
+        "Contact details are masked until confirmed by admin approval."
+    ),
+)
+async def get_received_inquiries(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    controller: InquiryController = Depends(get_controller),
+):
+    inquiries = await controller.getReceivedInquiries(current_user=current_user)
+    return SuccessResponse(
+        message="Received inquiries retrieved successfully",
+        data=inquiries,
+    )
+
+
 # ── Get Agent Inquiries ──────────────────────────────────────────────
 
 
@@ -76,14 +100,14 @@ async def get_my_inquiries(
     response_model=SuccessResponse[list[InquiryResponse]],
     status_code=status.HTTP_200_OK,
     summary="Get inquiries for an agent",
-    description="Retrieve all inquiries received by a specific agent.",
+    description="Retrieve inquiries received by a specific agent (masked if pending admin approval).",
 )
 async def get_agent_inquiries(
     agent_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
     controller: InquiryController = Depends(get_controller),
 ):
-    inquiries = await controller.getAgentInquiries(agent_id=agent_id)
+    inquiries = await controller.getAgentInquiries(agent_id=agent_id, current_user=current_user)
     return SuccessResponse(
         message="Agent inquiries retrieved successfully",
         data=inquiries,
@@ -98,14 +122,14 @@ async def get_agent_inquiries(
     response_model=SuccessResponse[list[InquiryResponse]],
     status_code=status.HTTP_200_OK,
     summary="Get inquiries for a builder",
-    description="Retrieve all inquiries received by a specific builder.",
+    description="Retrieve inquiries received by a specific builder.",
 )
 async def get_builder_inquiries(
     builder_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
     controller: InquiryController = Depends(get_controller),
 ):
-    inquiries = await controller.getBuilderInquiries(builder_id=builder_id)
+    inquiries = await controller.getBuilderInquiries(builder_id=builder_id, current_user=current_user)
     return SuccessResponse(
         message="Builder inquiries retrieved successfully",
         data=inquiries,
@@ -126,7 +150,7 @@ async def get_all_inquiries(
     current_user: Annotated[User, Depends(get_current_active_user)],
     controller: InquiryController = Depends(get_controller),
 ):
-    inquiries = await controller.getAllInquiries()
+    inquiries = await controller.getAllInquiries(current_user=current_user)
     return SuccessResponse(
         message="All inquiries retrieved successfully",
         data=inquiries,
@@ -148,7 +172,7 @@ async def get_inquiry(
     current_user: Annotated[User, Depends(get_current_active_user)],
     controller: InquiryController = Depends(get_controller),
 ):
-    inquiry = await controller.getInquiry(inquiry_id=id)
+    inquiry = await controller.getInquiry(inquiry_id=id, current_user=current_user)
     if not inquiry:
         raise NotFoundException(f"Inquiry with ID {id} not found")
 

@@ -1,4 +1,5 @@
-from sqlalchemy import select
+from typing import Any
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -43,3 +44,46 @@ class UserRepository:
         await self.db.flush()
         await self.db.refresh(user)
         return user
+
+    async def delete(self, user: User) -> None:
+        await self.db.delete(user)
+        await self.db.flush()
+
+    async def list_users(
+        self,
+        filters: dict[str, Any],
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[User], int]:
+        query = select(User).options(
+            selectinload(User.agent_profile),
+            selectinload(User.builder_profile),
+            selectinload(User.admin_profile),
+        )
+
+        if filters.get("role"):
+            query = query.where(User.role == filters["role"])
+        if filters.get("is_active") is not None:
+            query = query.where(User.is_active == filters["is_active"])
+        if filters.get("is_verified") is not None:
+            query = query.where(User.is_verified == filters["is_verified"])
+
+        if filters.get("search"):
+            term = f"%{filters['search']}%"
+            query = query.where(
+                or_(
+                    User.full_name.ilike(term),
+                    User.email.ilike(term),
+                    User.phone.ilike(term),
+                )
+            )
+
+        count_query = select(func.count()).select_from(query.subquery())
+        total_res = await self.db.execute(count_query)
+        total = total_res.scalar_one()
+
+        query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        items = list(result.scalars().all())
+
+        return items, total

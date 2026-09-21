@@ -1,6 +1,3 @@
-
-# app/modules/admin/schemas.py
-
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -72,3 +69,32 @@ class AdminActionResponse(BaseModel):
     description: str | None
     ip_address: str | None
     created_at: datetime
+
+
+class PropertyRejectRequest(BaseModel):
+    reason: str | None = Field(
+        default=None,
+        description="Reason for rejecting the property listing",
+    )
+
+
+class ReportResolveRequest(BaseModel):
+    admin_notes: str | None = Field(
+        default=None,
+        description="Notes explaining resolution of report",
+    )
+
+
+class InquiryAdminActionRequest(BaseModel):
+    admin_notes: str | None = Field(
+        default=None,
+        description="Notes regarding payment discussion or confirmation",
+    )
+
+
+class VerificationUpdateRequest(BaseModel):
+    verification_status: str = Field(
+        default="VERIFIED",
+        pattern="^(VERIFIED|REJECTED|PENDING|SUSPENDED)$",
+        description="Status to set for agent or builder",
+    )

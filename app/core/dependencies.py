@@ -82,10 +82,17 @@ async def get_current_agent(
 
 async def get_current_admin(
     current_user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Admin:
     if not current_user.admin_profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Admin profile not found for this account",
-        )
+        from sqlalchemy import select
+        res = await db.execute(select(Admin).where(Admin.user_id == current_user.id))
+        admin = res.scalar_one_or_none()
+        if not admin:
+            admin = Admin(user_id=current_user.id, admin_level="SUPER_ADMIN")
+            db.add(admin)
+            await db.commit()
+            await db.refresh(admin)
+        current_user.admin_profile = admin
     return current_user.admin_profile
+

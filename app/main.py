@@ -36,6 +36,9 @@ app.add_middleware(
 # ── Routers ────────────────────────────────────────────────────────
 
 app.include_router(routes, prefix="/api/v1")
+from app.modules.admin.routes import router as admin_router  # noqa: E402
+app.include_router(admin_router)
+
 
 # ── Exception Handlers ─────────────────────────────────────────────
 

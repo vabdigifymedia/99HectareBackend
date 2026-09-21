@@ -1,11 +1,13 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -79,6 +81,19 @@ class Inquiry(Base):
 
     source: Mapped[str | None] = mapped_column(
         String(50),
+        nullable=True,
+    )
+
+    is_admin_approved: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        index=True,
+    )
+
+    admin_notes: Mapped[str | None] = mapped_column(
+        Text,
         nullable=True,
     )
 

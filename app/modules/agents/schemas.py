@@ -48,6 +48,41 @@ class AgentCreate(BaseModel):
     website: HttpUrl | None = None
 
 
+class AgentProfileCreate(BaseModel):
+    agency_name: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+
+    description: str | None = None
+
+    license_number: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    experience_years: int = Field(
+        default=0,
+        ge=0,
+        le=100,
+    )
+
+    rera_registration_number: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    phone: str | None = Field(
+        default=None,
+        max_length=20,
+    )
+
+    email: EmailStr | None = None
+
+    website: HttpUrl | None = None
+
+
+
 class AgentUpdate(BaseModel):
     agency_name: str | None = Field(
         default=None,
@@ -112,3 +147,27 @@ class AgentResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class AgentListResponse(BaseModel):
+    items: list[AgentResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+from app.modules.properties.schemas import PropertyCreate, PropertyResponse  # noqa: E402
+
+
+class AgentBulkPropertyCreate(BaseModel):
+    properties: list[PropertyCreate] = Field(
+        ...,
+        min_length=1,
+        description="List of properties to create for this agent",
+    )
+
+
+class AgentBulkPropertyResponse(BaseModel):
+    created_count: int
+    properties: list[PropertyResponse]

@@ -13,7 +13,8 @@ from app.core.config import settings
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
 
 jinja_env = Environment(
-    loader=FileSystemLoader(TEMPLATE_DIR)
+    loader=FileSystemLoader("/var/task/app/templates/emails")
+
 )
 
 

@@ -226,7 +226,7 @@ class AuthService:
         await EmailService.send_template_email(
             to_email=settings.EMAIL,
             subject="99-Hectare Email Verification Code",
-            template_name="otp.html",
+            template_name="emails/otp.html",
             context={
                 "otp": otp,
                 "expiry_minutes": 10,

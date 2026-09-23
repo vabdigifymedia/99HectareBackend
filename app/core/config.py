@@ -8,6 +8,15 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     REDIS_URL: str
+    EMAIL: str
+
+    # SMTP Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str
+    SMTP_PASSWORD: str
+    SMTP_FROM_EMAIL: str
+    SMTP_FROM_NAME: str = "99-Hectare"
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"

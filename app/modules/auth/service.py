@@ -3,6 +3,9 @@ import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
+from jinja2 import Environment, FileSystemLoader
+from pathlib import Path
+
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +33,7 @@ from app.modules.auth.repository import AuthRepository
 from app.modules.builders.models import Builder
 from app.modules.users.models import User
 from app.modules.users.repository import UserRepository
+from app.utils.mail_service import EmailService
 
 
 class AuthService:
@@ -219,11 +223,15 @@ class AuthService:
         await self.auth_repo.create_otp(otp_record)
         await self.db.commit()
 
-        # 🔥 LOUD STDOUT PRINT FOR CONSOLE TESTING 🔥
-        print(f"\n{'='*64}", flush=True)
-        print(f"🔥 [EMAIL VERIFICATION OTP] CODE FOR {email}: {otp}", flush=True)
-        print(f"🔥 User ID: {user.id} | Valid for: 10 minutes", flush=True)
-        print(f"{'='*64}\n", flush=True)
+        await EmailService.send_template_email(
+            to_email=settings.EMAIL,
+            subject="99-Hectare Email Verification Code",
+            template_name="emails/otp.html",
+            context={
+                "otp": otp,
+                "expiry_minutes": 10,
+            },
+        )
 
         return otp
 
@@ -265,11 +273,15 @@ class AuthService:
         await self.auth_repo.create_otp(otp_record)
         await self.db.commit()
 
-        # 🔥 LOUD STDOUT PRINT FOR CONSOLE TESTING 🔥
-        print(f"\n{'='*64}", flush=True)
-        print(f"🔥 [PASSWORD RESET OTP] CODE FOR {email}: {otp}", flush=True)
-        print(f"🔥 User ID: {user.id} | Valid for: 10 minutes", flush=True)
-        print(f"{'='*64}\n", flush=True)
+        await EmailService.send_template_email(
+            to_email=settings.EMAIL,
+            subject="99-Hectare Password Reset Code",
+            template_name="emails/otp.html",
+            context={
+                "otp": otp,
+                "expiry_minutes": 10,
+            },
+        )
 
         return otp
 
@@ -376,15 +388,19 @@ class AuthService:
         await self.auth_repo.create_otp(otp_record)
         await self.db.commit()
 
-        # 🔥 LOUD STDOUT PRINT FOR CONSOLE LOGGING & TESTING 🔥
-        print(f"\n{'='*64}", flush=True)
-        print(f"🔥 [99 HECTARES AUTH OTP] GENERATED OTP FOR {identifier}: {otp}", flush=True)
-        print(f"🔥 Purpose: {purpose} | User ID: {user.id} | Valid for: 15 minutes", flush=True)
-        print(f"{'='*64}\n", flush=True)
+        await EmailService.send_template_email(
+            to_email=settings.EMAIL,
+            subject="99-Hectare OTP Code",
+            template_name="emails/otp.html",
+            context={
+                "otp": otp,
+                "expiry_minutes": 15,
+            },
+        )
 
         return {
             "otp": otp,
-            "message": f"OTP successfully sent to {identifier}",
+            "message": f"OTP successfully sent to {settings.EMAIL}",
             "identifier": identifier,
             "user_id": user.id,
         }

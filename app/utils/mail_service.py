@@ -1,8 +1,7 @@
 from pathlib import Path
+import smtplib
 
 from jinja2 import Environment, FileSystemLoader
-
-import smtplib
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -10,11 +9,14 @@ from email.mime.text import MIMEText
 from app.core.config import settings
 
 
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
+# /var/task/app
+APP_DIR = Path(__file__).resolve().parent.parent
+
+# /var/task/app/templates
+TEMPLATE_DIR = APP_DIR / "templates"
 
 jinja_env = Environment(
-    loader=FileSystemLoader("/var/task/app/templates/emails")
-
+    loader=FileSystemLoader(TEMPLATE_DIR)
 )
 
 
@@ -27,12 +29,11 @@ class EmailService:
         template_name: str,
         context: dict,
     ):
-
         template = jinja_env.get_template(template_name)
 
         html_content = template.render(
             subject=subject,
-            **context
+            **context,
         )
 
         message = MIMEMultipart("alternative")
@@ -49,13 +50,13 @@ class EmailService:
             MIMEText(
                 html_content,
                 "html",
-                "utf-8"
+                "utf-8",
             )
         )
 
         with smtplib.SMTP(
             settings.SMTP_HOST,
-            settings.SMTP_PORT
+            settings.SMTP_PORT,
         ) as server:
 
             server.ehlo()
@@ -64,11 +65,11 @@ class EmailService:
 
             server.login(
                 settings.SMTP_USERNAME,
-                settings.SMTP_PASSWORD
+                settings.SMTP_PASSWORD,
             )
 
             server.sendmail(
                 settings.SMTP_FROM_EMAIL,
                 to_email,
-                message.as_string()
+                message.as_string(),
             )

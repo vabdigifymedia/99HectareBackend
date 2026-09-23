@@ -27,6 +27,7 @@ class FavoriteService:
             raise BadRequestException("Property already favorited")
 
         await self.repo.create(Favorite(user_id=current_user.id, property_id=data.property_id))
+        await self.db.commit()
 
         return property
 
@@ -41,10 +42,11 @@ class FavoriteService:
             raise NotFoundException("Favorite not found")
 
         await self.repo.delete(current_user.id, property_id)
+        await self.db.commit()
 
         return property
 
-    async def list_favorites(self, current_user: User) -> tuple[list[Property], int]:
+    async def list_favorites(self, current_user: User) -> list[Property]:
         return await self.repo.list_favorites(current_user.id)
 
     async def get_total_count(self, current_user: User) -> int:

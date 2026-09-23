@@ -1,8 +1,11 @@
 import random
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.common.enums import UserRole
 from app.common.exceptions import (
@@ -216,6 +219,12 @@ class AuthService:
         await self.auth_repo.create_otp(otp_record)
         await self.db.commit()
 
+        # 🔥 LOUD STDOUT PRINT FOR CONSOLE TESTING 🔥
+        print(f"\n{'='*64}", flush=True)
+        print(f"🔥 [EMAIL VERIFICATION OTP] CODE FOR {email}: {otp}", flush=True)
+        print(f"🔥 User ID: {user.id} | Valid for: 10 minutes", flush=True)
+        print(f"{'='*64}\n", flush=True)
+
         return otp
 
     async def verify_email(self, email: str, otp: str) -> None:
@@ -256,6 +265,12 @@ class AuthService:
         await self.auth_repo.create_otp(otp_record)
         await self.db.commit()
 
+        # 🔥 LOUD STDOUT PRINT FOR CONSOLE TESTING 🔥
+        print(f"\n{'='*64}", flush=True)
+        print(f"🔥 [PASSWORD RESET OTP] CODE FOR {email}: {otp}", flush=True)
+        print(f"🔥 User ID: {user.id} | Valid for: 10 minutes", flush=True)
+        print(f"{'='*64}\n", flush=True)
+
         return otp
 
     async def reset_password(self, email: str, otp: str, new_password: str) -> None:
@@ -295,6 +310,128 @@ class AuthService:
         user.password_hash = hash_password(new_password)
         await self.auth_repo.revoke_all_user_tokens(user.id)
         await self.db.commit()
+
+    # ── OTP Authentication (Login & Signup) ────────────────────────
+
+    async def _find_user_by_identifier(self, identifier: str) -> User | None:
+        clean_id = identifier.strip()
+        if "@" in clean_id:
+            return await self.user_repo.get_by_email(clean_id.lower())
+
+        # Phone match
+        user = await self.user_repo.get_by_phone(clean_id)
+        if user:
+            return user
+
+        digits = "".join(c for c in clean_id if c.isdigit())
+        if len(digits) >= 10:
+            last10 = digits[-10:]
+            result = await self.db.execute(
+                select(User).where(User.phone.like(f"%{last10}%"))
+            )
+            return result.scalar_one_or_none()
+        return None
+
+    async def send_otp(self, identifier: str, purpose: str = "login") -> dict:
+        clean_id = identifier.strip()
+        user = await self._find_user_by_identifier(clean_id)
+
+        if not user:
+            # Auto-provision user for seamless OTP authentication flow
+            digits = "".join(c for c in clean_id if c.isdigit())
+            if "@" in clean_id:
+                user_email = clean_id.lower()
+                user_phone = None
+                user_name = clean_id.split("@")[0].replace(".", " ").title()
+            else:
+                user_phone = clean_id
+                clean_phone_digits = digits[-10:] if len(digits) >= 10 else digits
+                user_email = f"user_{clean_phone_digits}@99hectares.com"
+                user_name = f"User {clean_phone_digits[-4:]}"
+
+            # Check if auto-generated email happens to exist
+            existing = await self.user_repo.get_by_email(user_email)
+            if existing:
+                user = existing
+            else:
+                user = User(
+                    full_name=user_name,
+                    email=user_email,
+                    phone=user_phone,
+                    password_hash=hash_password(secrets.token_urlsafe(16)),
+                    role=UserRole.BUYER.value,
+                    is_active=True,
+                    is_verified=False,
+                )
+                user = await self.user_repo.create(user)
+                await self.db.commit()
+
+        otp = self._generate_otp(6)
+        otp_record = OTPVerification(
+            user_id=user.id,
+            otp=otp,
+            purpose=purpose,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        )
+        await self.auth_repo.create_otp(otp_record)
+        await self.db.commit()
+
+        # 🔥 LOUD STDOUT PRINT FOR CONSOLE LOGGING & TESTING 🔥
+        print(f"\n{'='*64}", flush=True)
+        print(f"🔥 [99 HECTARES AUTH OTP] GENERATED OTP FOR {identifier}: {otp}", flush=True)
+        print(f"🔥 Purpose: {purpose} | User ID: {user.id} | Valid for: 15 minutes", flush=True)
+        print(f"{'='*64}\n", flush=True)
+
+        return {
+            "otp": otp,
+            "message": f"OTP successfully sent to {identifier}",
+            "identifier": identifier,
+            "user_id": user.id,
+        }
+
+    async def verify_otp_auth(
+        self,
+        identifier: str,
+        otp: str,
+        full_name: str | None = None,
+        role: str = "buyer",
+    ) -> dict:
+        clean_id = identifier.strip()
+        user = await self._find_user_by_identifier(clean_id)
+        if not user:
+            raise NotFoundException("No account or OTP request found for this identifier. Please request OTP first.")
+
+        otp_record = await self.auth_repo.get_latest_otp_for_user(user.id)
+        if not otp_record:
+            raise BadRequestException("No active OTP found. Please request a new OTP.")
+
+        if otp_record.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            raise BadRequestException("OTP expired. Please request a new OTP.")
+
+        if otp_record.otp != otp.strip():
+            raise BadRequestException("Invalid OTP code. Please check and try again.")
+
+        await self.auth_repo.mark_otp_verified(otp_record)
+        user.is_verified = True
+
+        if full_name and full_name.strip():
+            user.full_name = full_name.strip()
+
+        normalized_role = role.lower()
+        if normalized_role in [r.value for r in UserRole]:
+            user.role = normalized_role
+            if normalized_role == UserRole.AGENT.value:
+                existing_agent = await self.agent_repo.get_by_user_id(user.id)
+                if not existing_agent:
+                    self.db.add(Agent(user_id=user.id, phone=user.phone, email=user.email))
+            elif normalized_role == UserRole.BUILDER.value:
+                res = await self.db.execute(select(Builder).where(Builder.user_id == user.id))
+                if not res.scalar_one_or_none():
+                    self.db.add(Builder(user_id=user.id, company_name=user.full_name, phone=user.phone, email=user.email))
+
+        await self.db.commit()
+        user = await self.user_repo.get_by_id_with_profiles(user.id)
+        return await self._generate_tokens(user)
 
     # ── Helpers ────────────────────────────────────────────────────
 

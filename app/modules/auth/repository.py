@@ -76,6 +76,24 @@ class AuthRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_latest_otp_for_user(
+        self, user_id: int, purpose: str | None = None
+    ) -> OTPVerification | None:
+        conditions = [
+            OTPVerification.user_id == user_id,
+            OTPVerification.is_verified == False,
+        ]
+        if purpose:
+            conditions.append(OTPVerification.purpose == purpose)
+        result = await self.db.execute(
+            select(OTPVerification)
+            .where(*conditions)
+            .order_by(OTPVerification.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def mark_otp_verified(self, otp_record: OTPVerification) -> None:
         otp_record.is_verified = True
         await self.db.flush()
+

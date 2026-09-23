@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,6 +54,7 @@ async def root():
 
 
 @app.get("/db-test")
+@app.get("/api/v1/db-test")
 async def db_test():
     async with AsyncSessionLocal() as session:
         result = await session.execute(text("SELECT 1"))
@@ -61,5 +62,130 @@ async def db_test():
 
 
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@app.get("/api/v1/system/status")
+@app.get("/system/status")
+async def system_status():
+    import time
+    try:
+        import redis.asyncio as aioredis
+    except ImportError:
+        aioredis = None
+
+    status = {
+        "api": {
+            "status": "online",
+            "name": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "environment": settings.ENVIRONMENT,
+            "cors_origins": settings.cors_origins_list,
+        },
+        "database": {"status": "unknown"},
+        "redis": {"status": "unknown"},
+        "auth": {"status": "unknown"},
+        "demo_accounts": [
+            {
+                "role": "buyer",
+                "email": "aditya.mehta@example.com",
+                "password": "password123",
+                "name": "Aditya Mehta",
+            },
+            {
+                "role": "agent",
+                "email": "vikram.sharma@horizonrealty.in",
+                "password": "password123",
+                "name": "Vikram Sharma",
+            },
+            {
+                "role": "admin",
+                "email": "admin@99hectares.com",
+                "password": "admin123",
+                "name": "Platform Administrator",
+            },
+        ],
+    }
+
+    # 1. Database check
+    t0 = time.time()
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+            db_latency_ms = round((time.time() - t0) * 1000, 2)
+
+            user_count_res = await session.execute(text("SELECT count(*) FROM users"))
+            user_count = user_count_res.scalar() or 0
+
+            tables_res = await session.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"
+                )
+            )
+            table_count = tables_res.scalar() or 0
+
+            status["database"] = {
+                "status": "connected",
+                "latency_ms": db_latency_ms,
+                "tables_count": table_count,
+                "users_count": user_count,
+            }
+    except Exception as e:
+        status["database"] = {
+            "status": "error",
+            "error": str(e),
+            "latency_ms": round((time.time() - t0) * 1000, 2),
+        }
+
+    # 2. Redis check
+    t1 = time.time()
+    if aioredis:
+        try:
+            r = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=1.5)
+            await r.ping()
+            redis_latency_ms = round((time.time() - t1) * 1000, 2)
+            await r.aclose()
+            status["redis"] = {
+                "status": "connected",
+                "latency_ms": redis_latency_ms,
+            }
+        except Exception as e:
+            status["redis"] = {
+                "status": "offline_or_error",
+                "error": str(e),
+                "latency_ms": round((time.time() - t1) * 1000, 2),
+            }
+    else:
+        status["redis"] = {"status": "package_not_installed"}
+
+    # 3. Auth configuration check
+    try:
+        from app.core.security import create_access_token, decode_token
+
+        test_token = create_access_token(
+            subject="diagnostic-ping", claims={"role": "system"}
+        )
+        payload = decode_token(test_token)
+        status["auth"] = {
+            "status": "healthy",
+            "algorithm": settings.JWT_ALGORITHM,
+            "access_token_expire_minutes": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
+            "refresh_token_expire_days": settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS,
+            "token_verification": "passed"
+            if payload.get("sub") == "diagnostic-ping"
+            else "failed",
+        }
+    except Exception as e:
+        status["auth"] = {
+            "status": "error",
+            "error": str(e),
+        }
+
+    return status

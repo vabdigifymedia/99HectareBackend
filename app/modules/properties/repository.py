@@ -25,33 +25,70 @@ class PropertyRepository:
     async def get_by_id(self, property_id: int) -> Property | None:
         """Fetch a property by ID."""
         result = await self.db.execute(
-            select(Property).where(Property.id == property_id)
+            select(Property)
+            .options(
+                selectinload(Property.media),
+                selectinload(Property.city),
+                selectinload(Property.locality),
+            )
+            .where(Property.id == property_id)
         )
         return result.scalar_one_or_none()
 
     async def get_by_id_detailed(self, property_id: int) -> Property | None:
         """Fetch a property with all related entities eagerly loaded."""
-        result = await self.db.execute(
-            select(Property)
-            .options(
-                selectinload(Property.media),
-                selectinload(Property.amenities),
-                selectinload(Property.residential_details),
-                selectinload(Property.commercial_details),
-                selectinload(Property.plot_details),
-                selectinload(Property.owner),
-                selectinload(Property.agent),
-                selectinload(Property.builder),
-                selectinload(Property.project),
-                selectinload(Property.country),
-                selectinload(Property.state),
-                selectinload(Property.city),
-                selectinload(Property.locality),
-                selectinload(Property.sub_locality),
-            )
-            .where(Property.id == property_id)
+        return await self.get_by_slug_or_id(property_id)
+
+    async def get_by_slug_or_id(self, slug_or_id: str | int) -> Property | None:
+        """Fetch a property by ID or slug with all related entities eagerly loaded."""
+        detailed_options = (
+            selectinload(Property.media),
+            selectinload(Property.amenities),
+            selectinload(Property.residential_details),
+            selectinload(Property.commercial_details),
+            selectinload(Property.plot_details),
+            selectinload(Property.owner),
+            selectinload(Property.agent),
+            selectinload(Property.builder),
+            selectinload(Property.project),
+            selectinload(Property.country),
+            selectinload(Property.state),
+            selectinload(Property.city),
+            selectinload(Property.locality),
+            selectinload(Property.sub_locality),
         )
-        return result.scalar_one_or_none()
+        if isinstance(slug_or_id, int) or (isinstance(slug_or_id, str) and slug_or_id.isdigit()):
+            prop_id = int(slug_or_id)
+            result = await self.db.execute(
+                select(Property).options(*detailed_options).where(Property.id == prop_id)
+            )
+            item = result.scalar_one_or_none()
+            if item:
+                return item
+
+        if isinstance(slug_or_id, str):
+            parts = slug_or_id.rsplit("-", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                prop_id = int(parts[1])
+                result = await self.db.execute(
+                    select(Property).options(*detailed_options).where(Property.id == prop_id)
+                )
+                item = result.scalar_one_or_none()
+                if item:
+                    return item
+            # Try matching by title keyword
+            first_words = slug_or_id.replace("-", " ").split()[:3]
+            if first_words:
+                query_term = f"%{'%'.join(first_words)}%"
+                result = await self.db.execute(
+                    select(Property).options(*detailed_options).where(Property.title.ilike(query_term)).limit(1)
+                )
+                item = result.scalar_one_or_none()
+                if item:
+                    return item
+
+        return None
+
 
     async def list_properties(
         self,
@@ -64,10 +101,13 @@ class PropertyRepository:
         conditions = []
 
         if filters.get("property_type"):
-            conditions.append(Property.property_type == filters["property_type"])
+            clean_pt = str(filters["property_type"]).strip().lower()
+            conditions.append(func.lower(Property.property_type) == clean_pt)
 
         if filters.get("listing_type"):
-            conditions.append(Property.listing_type == filters["listing_type"])
+            clean_lt = str(filters["listing_type"]).strip().upper()
+            conditions.append(func.upper(Property.listing_type) == clean_lt)
+
 
         if filters.get("status"):
             conditions.append(Property.status == filters["status"])
@@ -122,16 +162,54 @@ class PropertyRepository:
         if filters.get("owner_id"):
             conditions.append(Property.owner_id == filters["owner_id"])
 
-        if filters.get("search"):
-            term = f"%{filters['search'].strip()}%"
-            conditions.append(
-                or_(
-                    Property.title.ilike(term),
-                    Property.description.ilike(term),
-                    Property.address.ilike(term),
-                    Property.landmark.ilike(term),
-                )
-            )
+        # Location / City filter with Indian metro aliases (Gurgaon <-> Gurugram, etc.)
+        loc_term = filters.get("location") or filters.get("city")
+        if loc_term and loc_term.strip():
+            raw_loc = loc_term.strip().lower()
+            loc_aliases = [f"%{raw_loc}%"]
+            if "gurgaon" in raw_loc or "gurugram" in raw_loc:
+                loc_aliases.extend(["%gurgaon%", "%gurugram%"])
+            if "bangalore" in raw_loc or "bengaluru" in raw_loc:
+                loc_aliases.extend(["%bangalore%", "%bengaluru%"])
+            if "delhi" in raw_loc:
+                loc_aliases.extend(["%delhi%", "%new delhi%", "%south delhi%"])
+            if "mumbai" in raw_loc or "bombay" in raw_loc:
+                loc_aliases.extend(["%mumbai%", "%bombay%"])
+
+            loc_subconds = []
+            for a in loc_aliases:
+                loc_subconds.extend([
+                    Property.address.ilike(a),
+                    Property.landmark.ilike(a),
+                    Property.city_id.in_(select(City.id).where(City.name.ilike(a))),
+                    Property.locality_id.in_(select(Locality.id).where(Locality.name.ilike(a))),
+                ])
+            conditions.append(or_(*loc_subconds))
+
+        if filters.get("search") and filters["search"].strip():
+            raw_s = filters["search"].strip().lower()
+            s_aliases = [f"%{raw_s}%"]
+            if "gurgaon" in raw_s or "gurugram" in raw_s:
+                s_aliases.extend(["%gurgaon%", "%gurugram%"])
+            if "bangalore" in raw_s or "bengaluru" in raw_s:
+                s_aliases.extend(["%bangalore%", "%bengaluru%"])
+            if "delhi" in raw_s:
+                s_aliases.extend(["%delhi%", "%new delhi%", "%south delhi%"])
+            if "mumbai" in raw_s or "bombay" in raw_s:
+                s_aliases.extend(["%mumbai%", "%bombay%"])
+
+            s_subconds = [
+                Property.title.ilike(f"%{filters['search'].strip()}%"),
+                Property.description.ilike(f"%{filters['search'].strip()}%"),
+            ]
+            for a in s_aliases:
+                s_subconds.extend([
+                    Property.address.ilike(a),
+                    Property.landmark.ilike(a),
+                    Property.city_id.in_(select(City.id).where(City.name.ilike(a))),
+                    Property.locality_id.in_(select(Locality.id).where(Locality.name.ilike(a))),
+                ])
+            conditions.append(or_(*s_subconds))
 
         # Count total matches
         count_query = select(func.count(Property.id)).where(*conditions)
@@ -155,6 +233,8 @@ class PropertyRepository:
             select(Property)
             .options(
                 selectinload(Property.media),
+                selectinload(Property.city),
+                selectinload(Property.locality),
             )
             .where(*conditions)
             .order_by(order_by)

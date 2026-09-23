@@ -5,6 +5,9 @@ from app.modules.visits.schemas import VisitCreate, VisitListResponse, VisitResp
 from app.modules.visits.repository import VisitRepository
 
 
+from app.modules.users.models import User
+
+
 class VisitService:
     def __init__(self , db:AsyncSession):
         self.repository = VisitRepository(db)
@@ -32,11 +35,22 @@ class VisitService:
         visits = await self.repository.get_by_agent(agent_id)
         return visits    
 
-    async def update_visit_status(self , id:int , status:str , confirmed_date:datetime , agent_notes:str , cancellation_reason:str):
+    async def update_visit_status(
+        self,
+        id: int,
+        data: VisitStatusUpdate,
+        current_user: User | None = None,
+    ):
         visit = await self.repository.get_by_id(id)
         if visit is None:
             return None
-        visit = await self.repository.update_status(visit , status , confirmed_date , agent_notes , cancellation_reason)
+        visit = await self.repository.update_status(
+            visit=visit,
+            status=data.status,
+            confirmed_date=data.confirmed_date,
+            agent_notes=data.agent_notes,
+            cancellation_reason=data.cancellation_reason,
+        )
         return visit
 
     async def delete_visit(self , id:int):

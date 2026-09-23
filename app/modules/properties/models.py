@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -400,6 +401,11 @@ class Property(Base):
         back_populates="property",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def slug(self) -> str:
+        s = re.sub(r"[^a-zA-Z0-9]+", "-", self.title or "").strip("-").lower()
+        return f"{s}-{self.id}" if s else f"property-{self.id}"
 
 
 class ResidentialPropertyDetails(Base):

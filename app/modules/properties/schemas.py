@@ -8,6 +8,7 @@ from pydantic import (
 )
 
 from app.modules.amenities.schemas import AmenityResponse
+from app.modules.locations.schemas import CityResponse, LocalityResponse
 from app.modules.media.schemas import PropertyMediaResponse
 
 
@@ -292,6 +293,8 @@ class PropertyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    slug: str | None = None
+    media: list[PropertyMediaResponse] = []
 
     title: str
     description: str | None
@@ -337,6 +340,9 @@ class PropertyResponse(BaseModel):
     city_id: int | None
     locality_id: int | None
     sub_locality_id: int | None
+
+    city: CityResponse | None = None
+    locality: LocalityResponse | None = None
 
     address: str | None
     landmark: str | None

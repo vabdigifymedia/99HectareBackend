@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.properties.models import Property
 from app.modules.visits.models import Visit
 from app.modules.visits.schemas import VisitCreate
 
@@ -17,10 +18,14 @@ class VisitRepository:
         user_id: int,
         data: VisitCreate,
     ) -> Visit:
+        prop_res = await self.db.execute(select(Property).where(Property.id == data.property_id))
+        prop = prop_res.scalar_one_or_none()
+        agent_id = prop.agent_id if prop else None
 
         visit = Visit(
             user_id=user_id,
             property_id=data.property_id,
+            agent_id=agent_id,
             requested_date=data.requested_date,
             user_notes=data.user_notes,
         )

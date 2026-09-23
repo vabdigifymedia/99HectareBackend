@@ -17,11 +17,14 @@ from app.modules.auth.schemas import (
     RegisterRequest,
     RequestOTPRequest,
     ResetPasswordRequest,
+    SendOTPRequest,
     TokenResponse,
     UserResponse,
+    VerifyOTPAuthRequest,
     VerifyOTPRequest,
 )
 from app.modules.users.models import User
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -164,3 +167,25 @@ async def get_me(
 ):
     user = await controller.get_current_user(user_id=current_user.id)
     return SuccessResponse(message="User profile", data=user)
+
+
+# ── OTP Authentication (Login / Signup) ───────────────────────────
+
+
+@router.post("/otp/send", response_model=SuccessResponse)
+async def send_otp(
+    body: SendOTPRequest,
+    controller: AuthController = Depends(get_controller),
+):
+    data = await controller.send_otp(body)
+    return SuccessResponse(message="OTP sent successfully", data=data)
+
+
+@router.post("/otp/verify", response_model=SuccessResponse[TokenResponse])
+async def verify_otp(
+    body: VerifyOTPAuthRequest,
+    controller: AuthController = Depends(get_controller),
+):
+    data = await controller.verify_otp_auth(body)
+    return SuccessResponse(message="Authentication successful", data=data)
+

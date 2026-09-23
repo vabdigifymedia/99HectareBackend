@@ -1,9 +1,9 @@
-from typing import Any
-
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.favorites.models import Favorite
+from app.modules.properties.models import Property
 
 
 class FavoriteRepository:
@@ -17,10 +17,9 @@ class FavoriteRepository:
 
     async def delete(self, user_id: int, property_id: int) -> bool:
         result = await self.db.execute(
-            update(Favorite)
+            delete(Favorite)
             .where(Favorite.user_id == user_id)
             .where(Favorite.property_id == property_id)
-            .values(is_active=False)
         )
         await self.db.flush()
         return result.rowcount > 0
@@ -34,23 +33,22 @@ class FavoriteRepository:
         return result.scalar_one_or_none()
 
     async def list_favorites(
-        self, user_id: int, offset: int = 0, limit: int = 20
-    ) -> tuple[list[Favorite], int]:
+        self, user_id: int, offset: int = 0, limit: int = 50
+    ) -> list[Property]:
         result = await self.db.execute(
-            select(Favorite)
+            select(Property)
+            .join(Favorite, Favorite.property_id == Property.id)
+            .options(
+                selectinload(Property.media),
+                selectinload(Property.city),
+                selectinload(Property.locality),
+            )
             .where(Favorite.user_id == user_id)
             .order_by(Favorite.created_at.desc())
             .offset(offset)
             .limit(limit)
         )
-        items = list(result.scalars().all())
-
-        count_result = await self.db.execute(
-            select(func.count(Favorite.id)).where(Favorite.user_id == user_id)
-        )
-        total = count_result.scalar_one()
-
-        return items, total
+        return list(result.scalars().all())
 
     async def get_total_count(self, user_id: int) -> int:
         result = await self.db.execute(

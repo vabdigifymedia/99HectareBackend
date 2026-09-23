@@ -34,7 +34,7 @@ class PropertyController:
             current_user=current_user,
         )
 
-    async def get_property(self, property_id: int, current_user: User | None = None):
+    async def get_property(self, property_id: int | str, current_user: User | None = None):
         return await self.service.get_property(
             property_id=property_id, current_user=current_user
         )

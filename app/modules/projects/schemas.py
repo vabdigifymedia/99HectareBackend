@@ -7,7 +7,8 @@ from pydantic import (
     ConfigDict,
     Field,
 )
-
+from app.modules.amenities.schemas import AmenityResponse
+from app.modules.media.schemas import ProjectMediaResponse
 
 class ProjectCreate(BaseModel):
     builder_id: int
@@ -168,7 +169,11 @@ class ProjectResponse(BaseModel):
     latitude: float | None
     longitude: float | None
 
-    rera_number: str | None
+    rera_number: str | None = None
+
+    slug: str | None = None
+    media: list[ProjectMediaResponse] = []
+    amenities: list[AmenityResponse] = []
 
     created_at: datetime
     updated_at: datetime
@@ -245,3 +250,7 @@ class ProjectUnitResponse(BaseModel):
     available_units: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class ProjectDetailResponse(ProjectResponse):
+    units: list[ProjectUnitResponse] = []

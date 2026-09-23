@@ -211,11 +211,11 @@ class PropertyService:
     # ── Get Property Details ───────────────────────────────────────────
 
     async def get_property(
-        self, property_id: int, current_user: User | None = None
+        self, property_id: int | str, current_user: User | None = None
     ) -> Property:
-        prop = await self.repo.get_by_id_detailed(property_id)
+        prop = await self.repo.get_by_slug_or_id(property_id)
         if not prop:
-            raise NotFoundException(f"Property with ID {property_id} not found")
+            raise NotFoundException(f"Property with ID or slug '{property_id}' not found")
         return prop
 
     # ── Update Property ────────────────────────────────────────────────

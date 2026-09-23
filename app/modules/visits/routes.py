@@ -37,7 +37,11 @@ async def create_visit(
     current_user: Annotated[User , Depends(get_current_active_user)],
     controller: VisitController = Depends(get_controller),
 ):
-    return await controller.create_visit(user_id=current_user.id , data=body)
+    visit = await controller.create_visit(user_id=current_user.id , data=body)
+    return SuccessResponse(
+        message="Visit requested successfully",
+        data=visit,
+    )
 
 @router.get(
     "/{id}",
@@ -71,7 +75,11 @@ async def get_visits_by_user(
     current_user: Annotated[User , Depends(get_current_active_user)],
     controller: VisitController = Depends(get_controller),
 ):
-    return await controller.get_visits_by_user(user_id)
+    visits = await controller.get_visits_by_user(user_id)
+    return SuccessResponse(
+        message="User visits retrieved successfully",
+        data=visits,
+    )
 
 @router.get(
     "/agent/{agent_id}",
@@ -85,7 +93,11 @@ async def get_visits_by_agent(
     current_user:Annotated[User , Depends(get_current_active_user)],
     controller:VisitController = Depends(get_controller),
 ):
-    return await controller.get_visits_by_agent(agent_id)
+    visits = await controller.get_visits_by_agent(agent_id)
+    return SuccessResponse(
+        message="Agent visits retrieved successfully",
+        data=VisitListResponse(items=visits, total=len(visits)),
+    )
 
 @router.patch(
     "/{id}/status",
@@ -100,7 +112,13 @@ async def update_visit_status(
     current_user: Annotated[User , Depends(get_current_active_user)],
     controller:VisitController = Depends(get_controller),
 ):
-    return await controller.update_visit_status(id , status , current_user)
+    visit = await controller.update_visit_status(id , status , current_user)
+    if not visit:
+        raise NotFoundException(f"Visit with ID {id} not found")
+    return SuccessResponse(
+        message="Visit status updated successfully",
+        data=visit,
+    )
 
 @router.delete(
     "/{id}",
@@ -114,4 +132,10 @@ async def delete_visit(
     current_user: Annotated[User , Depends(get_current_active_user)],
     controller:VisitController = Depends(get_controller),
 ):
-    return await controller.delete_visit(id)
+    success = await controller.delete_visit(id)
+    if not success:
+        raise NotFoundException(f"Visit with ID {id} not found")
+    return SuccessResponse(
+        message="Visit deleted successfully",
+        data="Visit deleted successfully",
+    )

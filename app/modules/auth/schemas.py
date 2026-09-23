@@ -91,3 +91,16 @@ class BecomeAgentRequest(BaseModel):
     phone: str | None = None
     website: str | None = None
     description: str | None = None
+
+
+class SendOTPRequest(BaseModel):
+    identifier: str  # Phone number or email
+    purpose: str = "login"  # "login", "register", "verification"
+
+
+class VerifyOTPAuthRequest(BaseModel):
+    identifier: str
+    otp: str
+    full_name: str | None = None
+    role: str = "buyer"
+

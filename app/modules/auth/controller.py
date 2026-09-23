@@ -9,9 +9,12 @@ from app.modules.auth.schemas import (
     RegisterRequest,
     RequestOTPRequest,
     ResetPasswordRequest,
+    SendOTPRequest,
+    VerifyOTPAuthRequest,
     VerifyOTPRequest,
 )
 from app.modules.auth.service import AuthService
+
 
 
 class AuthController:
@@ -72,3 +75,15 @@ class AuthController:
 
     async def get_current_user(self, user_id: int):
         return await self.service.get_current_user(user_id=user_id)
+
+    async def send_otp(self, body: SendOTPRequest) -> dict:
+        return await self.service.send_otp(identifier=body.identifier, purpose=body.purpose)
+
+    async def verify_otp_auth(self, body: VerifyOTPAuthRequest) -> dict:
+        return await self.service.verify_otp_auth(
+            identifier=body.identifier,
+            otp=body.otp,
+            full_name=body.full_name,
+            role=body.role,
+        )
+

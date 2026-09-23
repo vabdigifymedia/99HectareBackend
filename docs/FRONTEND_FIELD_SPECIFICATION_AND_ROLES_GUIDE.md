@@ -1,7 +1,7 @@
-# 99 Hectare — Frontend Data Dictionary & Roles Guide
+# 99 Hectare — Frontend Data Dictionary, Roles & API Routes Guide
 > **Audience**: Frontend Developers (React / Next.js / Vue / Mobile)  
-> **Scope**: Data Models, Field Specifications, Validation Rules, and Role Responsibilities (User, Agent, Admin).  
-> **Notice**: API routes and endpoints are excluded from this document as requested. This serves as the definitive reference for forms, TypeScript interfaces, and UI state management.
+> **Scope**: Data Models, Field Specifications, Validation Rules, Role Responsibilities, and API Routes (GET, POST, PUT, PATCH, DELETE).  
+> **Notice**: Includes complete API Route tables with HTTP methods, auth requirements, and request/response specifications directly alongside each field schema.
 
 ---
 
@@ -81,6 +81,26 @@ Platform governing authority (`role: admin`, with level `MODERATOR` or `SUPER_AD
 
 ### 2.1 Users & Authentication
 
+#### API Routes & Methods (Users & Authentication)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | Public | `RegisterRequest` (JSON) | Register new user account. Returns `TokenResponse`. |
+| `POST` | `/api/v1/auth/login` | Public | `LoginRequest` (email, password) | Log in with credentials. Returns `TokenResponse`. |
+| `POST` | `/api/v1/auth/refresh` | Public | `RefreshTokenRequest` (refresh_token) | Renew expired access token. Returns new tokens. |
+| `POST` | `/api/v1/auth/logout` | Public | `RefreshTokenRequest` (refresh_token) | Revoke refresh token and log out. |
+| `GET` | `/api/v1/auth/me` | Authenticated | *None* | Get current user profile and active role. |
+| `GET` | `/api/v1/users/me` | Authenticated | *None* | Get full profile of current logged-in user. |
+| `PUT` | `/api/v1/users/me` | Authenticated | `UserUpdate` (first_name, last_name, avatar_url) | Update profile details. |
+| `GET` | `/api/v1/users/{id}` | Public | Path: `id` (int) | Get public profile of a user by ID. |
+| `POST` | `/api/v1/auth/otp/send` | Public | `SendOTPRequest` (phone) | Send OTP for mobile login/signup. |
+| `POST` | `/api/v1/auth/otp/verify` | Public | `VerifyOTPAuthRequest` (phone, otp) | Verify OTP and authenticate. Returns `TokenResponse`. |
+| `POST` | `/api/v1/auth/forgot-password/request` | Public | `ForgotPasswordRequest` (email) | Request password reset verification code. |
+| `POST` | `/api/v1/auth/forgot-password/confirm` | Public | `ResetPasswordRequest` (email, otp, new_password) | Set new password with OTP. |
+| `POST` | `/api/v1/auth/change-password` | Authenticated | `ChangePasswordRequest` (current_password, new_password) | Change account password while logged in. |
+| `POST` | `/api/v1/auth/become-agent` | Authenticated | `BecomeAgentRequest` (agency_name, license_number, etc.) | Upgrade user account to Agent/Property Dealer. |
+| `POST` | `/api/v1/auth/verify-email/request` | Authenticated | `RequestOTPRequest` (email) | Request email verification code. |
+| `POST` | `/api/v1/auth/verify-email/confirm` | Authenticated | `VerifyOTPRequest` (email, otp) | Confirm email verification. |
+
 #### User Entity (`User`)
 | Field Name | Data Type | Required? | Default / Enums | Description / Constraints |
 | :--- | :--- | :--- | :--- | :--- |
@@ -121,6 +141,19 @@ Platform governing authority (`role: admin`, with level `MODERATOR` or `SUPER_AD
 
 ### 2.2 Agent Profile (`Agent`)
 
+#### API Routes & Methods (Agents)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/agents` | Public | Query: `search`, `city_id`, `is_featured`, `is_verified`, `page`, `page_size` | List and search verified agents. Returns `PaginatedResponse<AgentResponse>`. |
+| `GET` | `/api/v1/agents/{id}` | Public | Path: `id` (int) | Get agent public profile, bio, RERA info, and agency. |
+| `GET` | `/api/v1/agents/{id}/properties` | Public | Path: `id` (int), Query: `status`, `page`, `page_size` | Get all active property listings by this agent. |
+| `POST` | `/api/v1/agents` | Authenticated | `AgentProfileCreate` (JSON) | Initialize agent profile for current user. |
+| `GET` | `/api/v1/agents/me` | Agent (`require_agent`) | *None* | Get current logged-in agent's profile details. |
+| `PUT` | `/api/v1/agents/me` | Agent (`require_agent`) | `AgentUpdate` (JSON) | Update current agent's agency, bio, phone, license. |
+| `GET` | `/api/v1/agents/me/properties` | Agent (`require_agent`) | Query: `status`, `page`, `page_size` | Manage my property listings (draft, active, sold). |
+| `POST` | `/api/v1/agents/me/properties` | Agent (`require_agent`) | `PropertyCreate` (JSON) | Agent posts single property listing. |
+| `POST` | `/api/v1/agents/me/properties/bulk` | Agent (`require_agent`) | `AgentBulkPropertyCreate` (array of properties) | Bulk create/upload multiple property listings at once. |
+
 #### Agent Profile Fields (`AgentResponse` / `AgentCreate` / `AgentUpdate`)
 | Field Name | Data Type | Form Input Type | Constraints / Enums | Description |
 | :--- | :--- | :--- | :--- | :--- |
@@ -143,6 +176,21 @@ Platform governing authority (`role: admin`, with level `MODERATOR` or `SUPER_AD
 ---
 
 ### 2.3 Admin & Audit Logs (`Admin`, `AdminActionLog`)
+
+#### API Routes & Methods (Admin Control Panel)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/admin/users` | Admin (`require_admin`) | Query: `role`, `is_active`, `is_verified`, `search`, `page`, `page_size` | Search and list all platform users. |
+| `GET` | `/api/v1/admin/properties` | Admin (`require_admin`) | Query: `status`, `property_type`, `is_verified`, `search`, `page`, `page_size` | Review all property listings across all states. |
+| `PATCH` | `/api/v1/admin/properties/{id}/approve` | Admin (`require_admin`) | Path: `id` (int) | Approve and publish a property listing to public feed. |
+| `PATCH` | `/api/v1/admin/properties/{id}/reject` | Admin (`require_admin`) | Path: `id` (int), Body: `PropertyRejectRequest` (`reason`) | Reject a property listing with notes. |
+| `PATCH` | `/api/v1/admin/agents/{id}/verify` | Admin (`require_admin`) | Path: `id` (int), Body: `VerificationUpdateRequest` | Verify or reject agent profile/badge. |
+| `PATCH` | `/api/v1/admin/builders/{id}/verify` | Admin (`require_admin`) | Path: `id` (int), Body: `VerificationUpdateRequest` | Verify or reject builder company profile. |
+| `GET` | `/api/v1/admin/inquiries` | Admin (`require_admin`) | Query: `status`, `is_admin_approved`, `page`, `page_size` | Review buyer inquiries and middle payment status. |
+| `PATCH` | `/api/v1/admin/inquiries/{id}/approve` | Admin (`require_admin`) | Path: `id` (int), Body: `InquiryAdminActionRequest` | Confirm lead payment and unlock buyer contact info for agent/owner. |
+| `PATCH` | `/api/v1/admin/inquiries/{id}/reject` | Admin (`require_admin`) | Path: `id` (int), Body: `InquiryAdminActionRequest` | Reject lead request with notes. |
+| `GET` | `/api/v1/admin/reports` | Admin (`require_admin`) | Query: `status`, `reason`, `property_id`, `page`, `page_size` | View all filed complaints and reports. |
+| `PATCH` | `/api/v1/admin/reports/{id}/resolve` | Admin (`require_admin`) | Path: `id` (int), Body: `ReportResolveRequest` (`admin_notes`) | Mark report resolved with moderation notes. |
 
 #### Admin Entity (`AdminResponse`)
 | Field Name | Data Type | Constraints / Enums | Description |
@@ -171,6 +219,17 @@ Platform governing authority (`role: admin`, with level `MODERATOR` or `SUPER_AD
 ### 2.4 Properties (`Property`)
 
 The core entity representing real estate inventory (Apartments, Villas, Plots, Commercial spaces).
+
+#### API Routes & Methods (Properties)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/properties` | Public | Query: `search`, `city_id`, `locality_id`, `property_type`, `listing_type`, `min_price`, `max_price`, `bedrooms`, `bathrooms`, `furnishing_status`, `possession_status`, `is_verified`, `is_featured`, `sort_by`, `page`, `page_size` | Search and filter properties (99acres style). Returns `PaginatedResponse<PropertyResponse>`. |
+| `GET` | `/api/v1/properties/{id_or_slug}` | Public | Path: `id_or_slug` (int ID or string slug) | Get full property details, media gallery, amenities, and owner/agent details. |
+| `POST` | `/api/v1/properties` | Authenticated (Owner/Agent/Builder/Admin) | `PropertyCreate` (JSON) | Create a new property listing. |
+| `PUT` | `/api/v1/properties/{id}` | Authenticated (Owner/Agent/Admin) | Path: `id` (int), Body: `PropertyUpdate` (JSON) | Update property listing specs, pricing, or description. |
+| `DELETE` | `/api/v1/properties/{id}` | Authenticated (Owner/Agent/Admin) | Path: `id` (int) | Delete/archive property listing. |
+| `POST` | `/api/v1/properties/{id}/media` | Authenticated (Owner/Agent/Admin) | Path: `id` (int), Body: `PropertyMediaCreateInput` (JSON) | Add photos, floor plans, or video links to property. |
+| `POST` | `/api/v1/properties/{id}/amenities` | Authenticated (Owner/Agent/Admin) | Path: `id` (int), Body: `PropertyAmenitiesAssignRequest` (`amenity_ids`) | Associate amenities checklist to property. |
 
 #### 2.4.1 Core Property Listing Fields
 | Field Name | Data Type | Required? | Constraints / Enums | Description |
@@ -295,6 +354,11 @@ When rendering or creating a specific property type, additional dedicated detail
 
 ### 2.6 Media & Documents
 
+#### API Routes & Methods (Property Media)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/properties/{id}/media` | Authenticated (Owner/Agent/Admin) | Path: `id` (int), Body: `PropertyMediaCreateInput` (url, media_type, thumbnail_url, title, is_featured, display_order) | Attach photos, floor plans, video tour links, or brochures to property listing. |
+
 #### Property Media (`PropertyMediaResponse` / `PropertyMediaCreateInput`)
 | Field Name | Data Type | Required? | Constraints / Enums | Description |
 | :--- | :--- | :--- | :--- | :--- |
@@ -323,6 +387,22 @@ When rendering or creating a specific property type, additional dedicated detail
 
 This domain controls contact requests from prospective buyers to agents or builders.
 
+#### API Routes & Methods (Inquiries & Leads)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/inquiries` | Authenticated (Buyer) | `InquiryCreate` (property_id, message, preferred_contact_method, etc.) | Submit an inquiry/lead for a property or project. |
+| `GET` | `/api/v1/inquiries/my` | Authenticated (Buyer) | *None* | Get all inquiries submitted by the current user (unmasked). |
+| `GET` | `/api/v1/inquiries/received` | Authenticated (Agent/Owner) | Query: `status`, `page`, `page_size` | Get incoming buyer leads on my listings (masked until admin approves). |
+| `GET` | `/api/v1/inquiries/{id}` | Authenticated | Path: `id` (int) | Get inquiry details by ID. |
+| `GET` | `/api/v1/inquiries/{id}/status` | Authenticated | Path: `id` (int) | Check inquiry status and approval state. |
+| `PATCH` | `/api/v1/inquiries/{id}` | Authenticated | Path: `id` (int), Body: `InquiryUpdate` (`message`, `status`) | Update inquiry message or CRM lead state. |
+| `DELETE` | `/api/v1/inquiries/{id}` | Authenticated (Creator) | Path: `id` (int) | Withdraw/delete an inquiry. |
+| `GET` | `/api/v1/inquiries/agent/{agent_id}` | Authenticated | Path: `agent_id` (int) | Get inquiries directed to an agent. |
+| `GET` | `/api/v1/inquiries/builder/{builder_id}` | Authenticated | Path: `builder_id` (int) | Get inquiries directed to a builder. |
+| `GET` | `/api/v1/admin/inquiries` | Admin | Query: `status`, `is_admin_approved`, `page` | Admin view of all leads and middle payments. |
+| `PATCH` | `/api/v1/admin/inquiries/{id}/approve` | Admin | Path: `id` (int), Body: `InquiryAdminActionRequest` | Confirm lead fee and unlock buyer contact info for agent. |
+| `PATCH` | `/api/v1/admin/inquiries/{id}/reject` | Admin | Path: `id` (int), Body: `InquiryAdminActionRequest` | Reject lead inquiry. |
+
 #### Inquiry Fields (`InquiryResponse` / `InquiryCreate`)
 | Field Name | Data Type | Required? | Constraints / Enums | Description & Frontend Masking Behavior |
 | :--- | :--- | :--- | :--- | :--- |
@@ -346,6 +426,16 @@ This domain controls contact requests from prospective buyers to agents or build
 ### 2.8 Site Visits & Tours (`Visit`)
 
 Allows buyers to book in-person or virtual property tours with an agent.
+
+#### API Routes & Methods (Site Visits)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/visits` | Authenticated (Buyer) | `VisitCreate` (`property_id`, `requested_date`, `user_notes`) | Request a property site visit tour. |
+| `GET` | `/api/v1/visits/{id}` | Authenticated | Path: `id` (int) | Get visit details by ID. |
+| `GET` | `/api/v1/visits/user/{user_id}` | Authenticated (Buyer) | Path: `user_id` (int) | Get all visits requested by the specified user. |
+| `GET` | `/api/v1/visits/agent/{agent_id}` | Authenticated (Agent) | Path: `agent_id` (int) | Get all scheduled tours for an agent. |
+| `PATCH` | `/api/v1/visits/{id}/status` | Authenticated (Agent/Buyer) | Path: `id` (int), Body: `VisitStatusUpdate` (`status`, `confirmed_date`, `agent_notes`, `cancellation_reason`) | Confirm, reschedule, complete, or cancel visit. |
+| `DELETE` | `/api/v1/visits/{id}` | Authenticated (Creator) | Path: `id` (int) | Cancel and delete a visit request. |
 
 #### Visit Fields (`VisitResponse` / `VisitCreate` / `VisitStatusUpdate`)
 | Field Name | Data Type | Input / Source | Constraints / Enums | Description |
@@ -384,6 +474,14 @@ Social proof and credibility ratings left by buyers for agents and builders.
 ### 2.10 Reports & Complaints (`Report`)
 
 User reporting mechanism to flag fraudulent listings, incorrect info, or abusive agents.
+
+#### API Routes & Methods (Reports)
+| Method | Endpoint | Access / Auth | Request Body / Params | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/reports` | Authenticated | `ReportCreate` (`property_id`, `agent_id`, `reason`, `description`) | Submit complaint or flag a listing/agent. |
+| `GET` | `/api/v1/reports/my` | Authenticated | *None* | Get all reports submitted by current user. |
+| `GET` | `/api/v1/admin/reports` | Admin (`require_admin`) | Query: `status`, `reason`, `property_id`, `page`, `page_size` | Admin list of all reports across the platform. |
+| `PATCH` | `/api/v1/admin/reports/{id}/resolve` | Admin (`require_admin`) | Path: `id` (int), Body: `ReportResolveRequest` (`admin_notes`) | Admin resolves report with notes. |
 
 #### Report Fields (`ReportResponse` / `ReportCreate` / `ReportUpdate`)
 | Field Name | Data Type | Required? | Constraints / Enums | Description |

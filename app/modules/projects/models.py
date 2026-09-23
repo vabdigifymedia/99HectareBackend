@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -186,6 +187,11 @@ class Project(Base):
     state = relationship("State")
     city = relationship("City")
     locality = relationship("Locality")
+
+    @property
+    def slug(self) -> str:
+        s = re.sub(r"[^a-zA-Z0-9]+", "-", self.name or "").strip("-").lower()
+        return f"{s}-{self.id}" if s else f"project-{self.id}"
 
 
 class ProjectUnit(Base):

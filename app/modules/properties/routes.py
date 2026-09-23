@@ -73,6 +73,14 @@ async def list_properties(
         None,
         description="Search in title, description, address, landmark",
     ),
+    location: str | None = Query(
+        None,
+        description="Search city, locality, address or landmark with alias matching (e.g. Gurgaon, Gurugram, Noida)",
+    ),
+    city: str | None = Query(
+        None,
+        description="City name filter (e.g. Gurugram, Delhi, Noida, Bangalore, Mumbai)",
+    ),
     property_type: str | None = Query(None, description="e.g. apartment, villa, plot"),
     listing_type: str | None = Query(None, description="e.g. SALE, RENT"),
     property_status: str | None = Query(
@@ -99,10 +107,12 @@ async def list_properties(
         description="Sort ordering",
     ),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(20, ge=1, le=500, description="Items per page"),
 ):
     filters = {
         "search": search,
+        "location": location,
+        "city": city,
         "property_type": property_type,
         "listing_type": listing_type,
         "status": property_status,
@@ -146,11 +156,11 @@ async def list_properties(
 @router.get(
     "/{id}",
     response_model=SuccessResponse[PropertyDetailResponse],
-    summary="Get property details by ID",
+    summary="Get property details by ID or slug",
     description="Retrieve full property details including media, amenities, and owner/agent/project summaries.",
 )
 async def get_property(
-    id: int,
+    id: str,
     controller: PropertyController = Depends(get_controller),
 ):
     prop = await controller.get_property(property_id=id)

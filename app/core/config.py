@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Real Estate API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
-    REDIS_URL: str
+    REDIS_URL: str = ""
     EMAIL: str
 
     # SMTP Configuration

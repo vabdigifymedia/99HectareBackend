@@ -32,7 +32,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "https://99-hectare.vercel.app",
-        "https://99-hectare-three.vercel.app/",
+        "https://99-hectare-three.vercel.app",
         "https://99-hectare-pru5e87ex-vabit-digify-media.vercel.app",
     ],
     allow_credentials=True,

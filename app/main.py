@@ -25,9 +25,15 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://99-hectare.vercel.app",
+        "https://99-hectare-pru5e87ex-vabit-digify-media.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
